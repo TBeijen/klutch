@@ -4,9 +4,7 @@ from .exit_handler import ExitHandler
 
 
 def main():
-    """
-    Sets up api, logger and trigger control loop
-    """
+    """Set up api, logger and trigger control loop."""
     control_loop()
 
 
@@ -16,6 +14,6 @@ def control_loop():
         print("Doing things")
         sleep(2)
         print("Finished doing things")
-        
+
         with handler.safe_exit():
             sleep(5)
