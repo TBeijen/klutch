@@ -1,6 +1,9 @@
 import contextlib
+import logging
 import signal
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 class ExitHandler:
@@ -23,12 +26,18 @@ class ExitHandler:
         signal.signal(signal.SIGTERM, self.handle_signal)
 
     def handle_signal(self, signum, frame):
+        logger.info(
+            "Received termination signal {sig_name} ({signum})".format(
+                sig_name=signal.Signals(signum).name, signum=signum
+            )
+        )
         self.should_exit = True
         self.exit_if_needed()
 
     def exit_if_needed(self):
         """Do actual exit, only if needed and safe to do now."""
         if self.should_exit and self.safe_to_exit:
+            logger.info("Safe to exit. Exiting....")
             sys.exit(0)
 
     @contextlib.contextmanager

@@ -21,3 +21,27 @@ poetry shell
 
 python -m klutch --dry-run
 ```
+
+### Debugging in VScode
+
+`.vscode/launch.json`:
+```
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Module",
+            "type": "python",
+            "request": "launch",
+            "module": "klutch",
+            "args" : ["--dry-run"]
+        }
+    ]
+}
+```
+
+`.vscode/settings.json` (note the path when starting `poetry shell`):
+```
+{
+    "python.pythonPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.8"
+}
