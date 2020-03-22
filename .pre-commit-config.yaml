@@ -60,7 +60,6 @@ repos:
         language: system
         pass_filenames: false
         files: ^pyproject.toml$
-        stages: [push]
 
   # miscellaneous
 

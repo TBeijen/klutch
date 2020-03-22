@@ -36,7 +36,8 @@ class ExitHandler:
         """
         Context manager for code executionduring which program can safely exit.
 
-        Wraps sleep of main loop, if having caught term. signal during main loop, exit immediately
+        Wraps sleep of main loop.
+        If having caught term. signal during main loop, exit immediately when entering context.
 
         See: https://docs.python.org/3/library/contextlib.html
         """
