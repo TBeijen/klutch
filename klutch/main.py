@@ -1,7 +1,10 @@
 import logging
 from time import sleep
 
-from .exit_handler import ExitHandler
+import pykube
+
+from klutch.exit_handler import ExitHandler
+from klutch.kube_client import get_kube_client
 
 
 def main():
@@ -15,6 +18,10 @@ def main():
 def control_loop():
     handler = ExitHandler()
     while True:
+        client = get_kube_client()
+        hpa = pykube.HorizontalPodAutoscaler.objects(  # noqa: F841
+            client, namespace=pykube.all
+        )
         print("Doing things")
         sleep(2)
         print("Finished doing things")
