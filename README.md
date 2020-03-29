@@ -1,12 +1,22 @@
 Klutch
 ======
 
-> Putting horizontal pod autoscalers into overdrive
+> Putting your HPAs into overdrive
 
 
 
 
 
+
+TODO
+----
+- Finding own/current namespace
+- How is listing objects affected by having limited RBAC permissions?
+- Parallelism (webserver for triggers, control loop, metrics server)
+- e2e testing (kind?)
+- Triggers via AWS SNS
+- Notifications (Slack)
+- Golang?
 
 Development setup
 -----------------
