@@ -47,7 +47,8 @@ repos:
 
       - id: safety
         name: safety
-        entry: safety
+        # entry: safety
+        entry: poetry run safety
         language: system
         pass_filenames: false
         args: ["check", "--bare"]

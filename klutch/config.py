@@ -1,7 +1,26 @@
 import argparse
 
 
-def get_args():
+class Config:
+
+    debug = False
+    dry_run = False
+    interval = 10  # seconds
+    cooldown = 300  # seconds
+    namespace = None
+
+    def __init__(self, args):
+        self.debug = args.debug
+        self.dry_run = args.dry_run
+        if args.namespace:
+            self.namespace = args.namespace
+        else:
+            self.namespace = open(
+                "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+            ).read()
+
+
+def _get_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--debug", help="Debug mode", action="store_true",
@@ -11,6 +30,10 @@ def get_args():
     )
     parser.add_argument(
         "--namespace",
-        help="Namespace to operate in (only required when running out of cluster)",
+        help="Namespace to store status in. By default will use the namespace klutch is deployed in. (Required when running out of cluster)",
     )
-    return parser.parse_args()
+    return parser.parse_args(args)
+
+
+def get_config(args=None):
+    return Config(_get_args(args))
