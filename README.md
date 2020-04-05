@@ -51,7 +51,49 @@ python -m klutch --dry-run
 ```
 
 `.vscode/settings.json` (note the path when starting `poetry shell`):
-```
+
+```json
 {
     "python.pythonPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.8"
 }
+```
+
+### Running and debugging tests in VScode
+
+Via `cmd` + `shift` + `p`: 'Python: Discover Tests`.
+
+Test option (lab flask icon) should appear in left bar.
+
+`.vscode/settings.json` now includes:
+
+```json
+{
+    "python.pythonPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.8"
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true
+}
+```
+
+Be sure to open the output panel 'Python Test Log'.
+
+#### Enabling debugging of library code:
+
+Reference:
+
+* https://code.visualstudio.com/docs/python/testing#_debug-tests
+* (via: https://github.com/microsoft/ptvsd/issues/2073#issuecomment-589469906)
+
+Add to `.vscode/launch.json` (under `configurations`):
+
+```json
+        {
+            "name": "Python: Unit Tests",
+            "type": "python",
+            "request": "test",
+            "justMyCode": false,
+        }
+```

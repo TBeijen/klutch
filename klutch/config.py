@@ -9,6 +9,11 @@ class Config:
     cooldown = 300  # seconds
     namespace = None
 
+    cm_trigger_label = "klutch.it/trigger"
+    cm_status_label = "klutch.it/status"
+    hpa_annotation_enabled = "klutch.it/enabled"
+    hpa_annotation_scale_perc_of_actual = "klutch.it/scale-percentage-of-actual"
+
     def __init__(self, args):
         self.debug = args.debug
         self.dry_run = args.dry_run

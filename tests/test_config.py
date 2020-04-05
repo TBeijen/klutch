@@ -12,6 +12,13 @@ def test_defaults():
     assert config.dry_run is False
     assert config.interval == 10
     assert config.cooldown == 300
+    assert config.cm_trigger_label == "klutch.it/trigger"
+    assert config.cm_status_label == "klutch.it/status"
+    assert config.hpa_annotation_enabled == "klutch.it/enabled"
+    assert (
+        config.hpa_annotation_scale_perc_of_actual
+        == "klutch.it/scale-percentage-of-actual"
+    )
 
 
 @pytest.mark.parametrize(
@@ -37,13 +44,24 @@ def test_unknown_arg(monkeypatch):
     mock_exit.assert_called_once_with(2)
 
 
-def test_in_cluster_uses_namespace():
-    pass
+def test_in_cluster_uses_namespace(fs):
+    fs.create_file(
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+        contents="cluster-namespace",
+    )
+    config = get_config([])
+    assert config.namespace == "cluster-namespace"
 
 
-def test_in_cluster_override_namespace():
-    pass
+def test_in_cluster_override_namespace(fs):
+    fs.create_file(
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+        contents="cluster-namespace",
+    )
+    config = get_config(["--namespace=override-namespace"])
+    assert config.namespace == "override-namespace"
 
 
 def test_out_of_cluster_requires_namespace():
-    pass
+    with pytest.raises(FileNotFoundError):
+        get_config([])
