@@ -4,36 +4,52 @@ from time import sleep
 from klutch.client import get_kubernetes
 from klutch.config import get_config
 from klutch.exit_handler import ExitHandler
+from klutch.process import process_ongoing
+from klutch.process import process_orphans
+from klutch.process import process_triggers
+
+logger = logging.getLogger(__name__)
 
 
-def main():
-    """Set up api, logger and trigger control loop."""
-    config = get_config()
-    log_level = logging.DEBUG if config.debug else logging.INFO
+def main(args=None):
+    """Set up logger and trigger control loop."""
+    config = get_config(args)
     logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=log_level
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        level=logging.DEBUG if config.debug else logging.INFO,
     )
-    control_loop()
+    control_loop(config)
 
 
-def control_loop():
+def control_loop(config):
     handler = ExitHandler()
     while True:
-        client = get_kubernetes()
+        try:
+            client = get_kubernetes()
 
-        v1 = client.CoreV1Api()
-        print("Listing pods with their IPs:")
-        ret = v1.list_pod_for_all_namespaces(watch=False)
-        for i in ret.items:
-            print(
-                "{}\t{}\t{}".format(
-                    i.status.pod_ip, i.metadata.namespace, i.metadata.name
-                )
-            )
+            logger.info("Starting control loop")
 
-        print("Doing things")
-        sleep(2)
-        print("Finished doing things")
+            is_ongoing = process_ongoing(client, config)
+            if not is_ongoing:
+                is_ongoing = process_triggers(client, config)
+            if not is_ongoing:
+                process_orphans(client, config)
+        except Exception as e:
+            logger.exception("An error occured: %s", e)
+
+        # v1 = client.CoreV1Api()
+        # print("Listing pods with their IPs:")
+        # ret = v1.list_pod_for_all_namespaces(watch=False)
+        # for i in ret.items:
+        #     print(
+        #         "{}\t{}\t{}".format(
+        #             i.status.pod_ip, i.metadata.namespace, i.metadata.name
+        #         )
+        #     )
+
+        # print("Doing things")
+        # sleep(2)
+        # print("Finished doing things")
 
         with handler.safe_exit():
-            sleep(5)
+            sleep(config.interval)
