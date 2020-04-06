@@ -60,6 +60,14 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: mypy
+        name: mypy
+        description: Runs mypy static type checker
+        entry: poetry run mypy
+        args: ["--config-file=pyproject.toml", "klutch"]
+        language: system
+        pass_filenames: false
+
       - id: poetry
         name: poetry
         description: Validates the structure of the pyproject.toml file

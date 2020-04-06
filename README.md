@@ -10,7 +10,8 @@ Klutch
 
 TODO
 ----
-- Finding own/current namespace
+- [DONE] Finding own/current namespace
+- Alternate scale targets (absolute numbers, perc. of min.)
 - How is listing objects affected by having limited RBAC permissions?
 - Parallelism (webserver for triggers, control loop, metrics server)
 - e2e testing (kind?)

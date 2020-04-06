@@ -3,7 +3,6 @@ import logging
 import os
 
 from kubernetes import config
-from kubernetes.config.config_exception import ConfigException
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +13,7 @@ class Config:
     dry_run = False
     interval = 10  # seconds
     cooldown = 300  # seconds
+    trigger_max_age = 300  # seconds
     namespace = None
 
     cm_trigger_label_key = "klutch.it/trigger"
@@ -59,7 +59,7 @@ def configure_kubernetes():
     try:
         config.load_incluster_config()
         logger.debug("Configured kube_client from ServiceAccount")
-    except ConfigException:
+    except config.ConfigException:
         # Kubernetes SDK evaluates KUBECONFIG, however does so directly in module,
         # which is evaluated on directly on import, making it hard to mock.
         # For that reason evaluating here and passing in via config_file.

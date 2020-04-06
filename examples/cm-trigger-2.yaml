@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: example-trigger
+  name: klutch-trigger-2
   labels:
     klutch.it/trigger: "1"
 data: {}
