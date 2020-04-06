@@ -1,7 +1,7 @@
 import logging
 from time import sleep
 
-from klutch.client import get_kubernetes
+from klutch.config import configure_kubernetes
 from klutch.config import get_config
 from klutch.exit_handler import ExitHandler
 from klutch.process import process_ongoing
@@ -25,31 +25,18 @@ def control_loop(config):
     handler = ExitHandler()
     while True:
         try:
-            client = get_kubernetes()
+            # client = get_kubernetes()
+            configure_kubernetes()
 
             logger.info("Starting control loop")
 
-            is_ongoing = process_ongoing(client, config)
+            is_ongoing = process_ongoing(config)
             if not is_ongoing:
-                is_ongoing = process_triggers(client, config)
+                is_ongoing = process_triggers(config)
             if not is_ongoing:
-                process_orphans(client, config)
+                process_orphans(config)
         except Exception as e:
             logger.exception("An error occured: %s", e)
-
-        # v1 = client.CoreV1Api()
-        # print("Listing pods with their IPs:")
-        # ret = v1.list_pod_for_all_namespaces(watch=False)
-        # for i in ret.items:
-        #     print(
-        #         "{}\t{}\t{}".format(
-        #             i.status.pod_ip, i.metadata.namespace, i.metadata.name
-        #         )
-        #     )
-
-        # print("Doing things")
-        # sleep(2)
-        # print("Finished doing things")
 
         with handler.safe_exit():
             sleep(config.interval)

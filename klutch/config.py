@@ -1,4 +1,11 @@
 import argparse
+import logging
+import os
+
+from kubernetes import config
+from kubernetes.config.config_exception import ConfigException
+
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -9,8 +16,10 @@ class Config:
     cooldown = 300  # seconds
     namespace = None
 
-    cm_trigger_label = "klutch.it/trigger"
-    cm_status_label = "klutch.it/status"
+    cm_trigger_label_key = "klutch.it/trigger"
+    cm_trigger_label_value = "1"
+    cm_status_label_key = "klutch.it/status"
+    cm_status_label_value = "1"
     hpa_annotation_enabled = "klutch.it/enabled"
     hpa_annotation_scale_perc_of_actual = "klutch.it/scale-percentage-of-actual"
 
@@ -41,4 +50,18 @@ def _get_args(args):
 
 
 def get_config(args=None):
+    """Return config object, reflecting defaults and optional cli args."""
     return Config(_get_args(args))
+
+
+def configure_kubernetes():
+    """Configure kubernetes client."""
+    try:
+        config.load_incluster_config()
+        logger.debug("Configured kube_client from ServiceAccount")
+    except ConfigException:
+        # Kubernetes SDK evaluates KUBECONFIG, however does so directly in module,
+        # which is evaluated on directly on import, making it hard to mock.
+        # For that reason evaluating here and passing in via config_file.
+        config.load_kube_config(config_file=os.environ.get("KUBECONFIG"))
+        logger.debug("Configured kube_client from config file")
