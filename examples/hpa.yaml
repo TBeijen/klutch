@@ -3,6 +3,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   annotations:
     klutch.it/enabled: "1"
+    klutch.it/scale-percentage-of-actual: "200"
   name: klutch-hpa
 spec:
   maxReplicas: 10

@@ -21,6 +21,7 @@ class Config:
     cm_status_label_key = "klutch.it/status"
     cm_status_label_value = "1"
     hpa_annotation_enabled = "klutch.it/enabled"
+    hpa_annotation_status = "klutch.it/status"
     hpa_annotation_scale_perc_of_actual = "klutch.it/scale-percentage-of-actual"
 
     def __init__(self, args):

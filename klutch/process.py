@@ -1,3 +1,4 @@
+import json
 import logging
 
 from klutch import actions
@@ -48,15 +49,14 @@ def process_triggers(config: Config):
     )
     status = []
     for hpa in actions.find_hpas(config):
+        patched_hpa = actions.scale_hpa(config, hpa)
+        patched_hpa_status = json.loads(
+            patched_hpa.metadata.annotations.get(config.hpa_annotation_status)
+        )
         entry = {
-            "name": hpa.metadata.name,
-            "namespace": hpa.metadata.namespace,
-            "data": {
-                "originalMinReplicas": 123,
-                "originalCurrentReplicas": 123,
-                "appliedMinReplicas": 123,
-                "appliedAt": "some-date-time",
-            },
+            "name": patched_hpa.metadata.name,
+            "namespace": patched_hpa.metadata.namespace,
+            "status": patched_hpa_status,
         }
         status.append(entry)
         pass
