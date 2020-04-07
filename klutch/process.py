@@ -19,7 +19,7 @@ def process_triggers(config: Config):
         bool: Whether or not there is a sequence ongoing
     """
     logger.debug("Looking for trigger ConfigMap objects.")
-    trigger_cm_list = actions.find_triggers(config)  # noqa: F841
+    trigger_cm_list = actions.find_triggers(config)
 
     if not trigger_cm_list:
         logger.debug("No triggers found")
@@ -86,7 +86,12 @@ def process_ongoing(config: Config):
     Returns:
         bool: Whether or not there is a sequence ongoing
     """
-    return False
+    logger.debug("Looking for status ConfigMap objects.")
+    status_cm_list = actions.find_status(config)
+
+    if not status_cm_list:
+        logger.debug("No status found")
+        return False
 
 
 def process_orphans(config: Config):

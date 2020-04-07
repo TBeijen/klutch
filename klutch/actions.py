@@ -31,6 +31,14 @@ def delete_trigger(trigger: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(trigger.metadata.name, trigger.metadata.namespace)
 
 
+def find_status(config: Config) -> List[client.models.v1_config_map.V1ConfigMap]:
+    """Find any configmap labeled as status and return it. Recent first."""
+    resp = client.CoreV1Api().list_namespaced_config_map(
+        config.namespace, label_selector="{}={}".format(config.cm_status_label_key, config.cm_status_label_value,),
+    )
+    return sorted(resp.items, key=lambda n: n.metadata.creation_timestamp.timestamp(), reverse=True,)
+
+
 def create_status(config, status: list):
     config_map = client.models.v1_config_map.V1ConfigMap(
         data={"status": json.dumps(status)},

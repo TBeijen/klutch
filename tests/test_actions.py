@@ -84,6 +84,35 @@ def test_delete_trigger(mock_client):
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
+def test_find_status(mock_client):
+    mock_cm_new = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
+    mock_cm_new.metadata.name = "new"
+    mock_cm_new.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS)
+    mock_cm_old = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
+    mock_cm_old.metadata.name = "old"
+    mock_cm_old.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS - 100)
+
+    config = get_config(["--namespace=test-ns"])
+    config.cm_status_label_key = "test-status"
+    config.cm_status_label_value = "yes"
+
+    mock_config_list = MagicMock()
+    mock_config_list.items = [mock_cm_old, mock_cm_new]
+    mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_config_list
+
+    found = actions.find_status(config)
+
+    assert found == [mock_cm_new, mock_cm_old]  # sorted recent first
+    mock_client.CoreV1Api().list_namespaced_config_map.assert_called_once_with(
+        "test-ns", label_selector="test-status=yes"
+    )
+
+
+def test_create_status(mock_client):
+    """TODO."""
+    pass
+
+
 def test_find_hpas(mock_client):
     mock_hpa_enabled = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
     mock_hpa_enabled.metadata.annotations = {"klutch-enabled": "any-value-goes"}
