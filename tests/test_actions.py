@@ -110,7 +110,28 @@ def test_find_status(mock_client):
 
 def test_create_status(mock_client):
     """TODO."""
-    pass
+    config = get_config(["--namespace=test-ns"])
+    config.cm_status_name = "kl-status-name"
+    config.cm_status_label_key = "kl-status"
+    config.cm_status_label_value = "yes"
+
+    status = [{"foo": "bar"}]
+    mock_response = MagicMock()
+    mock_client.CoreV1Api().create_namespaced_config_map.return_value = mock_response
+
+    # Prevent models instantiated in sut to be mocks as well
+    mock_client.models = client.models
+
+    resp = actions.create_status(config, status)
+
+    call_args = mock_client.CoreV1Api().create_namespaced_config_map.call_args_list
+    assert len(call_args) == 1
+    assert call_args[0].args[0] == "test-ns"
+    assert type(call_args[0].args[1]) == client.models.v1_config_map.V1ConfigMap
+    assert call_args[0].args[1].metadata.name == "kl-status-name"
+    assert call_args[0].args[1].metadata.labels.get("kl-status") == "yes"
+    assert call_args[0].args[1].data.get("status") == json.dumps(status)
+    assert resp is mock_response
 
 
 def test_find_hpas(mock_client):
