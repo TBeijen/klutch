@@ -77,13 +77,13 @@ def scale_hpa(
         "originalMinReplicas": hpa.spec.min_replicas,
         "originalCurrentReplicas": hpa.status.current_replicas,
         "appliedMinReplicas": target_min_replicas,
-        "appliedAt": datetime.now().timestamp(),
+        "appliedAt": int(datetime.now().timestamp()),
     }
     patch = {
         "metadata": {"annotations": {config.hpa_annotation_status: json.dumps(status)}},
         "spec": {"minReplicas": target_min_replicas},
     }
-    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch,)
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch)
     logger.info(
         f"Scaled minReplicas from {spec_min_replicas} to {target_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"
     )

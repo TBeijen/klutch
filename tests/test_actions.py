@@ -1,3 +1,5 @@
+import json
+from contextlib import ExitStack as does_not_raise
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -15,6 +17,18 @@ def mock_client(monkeypatch):
     mock_client = MagicMock(spec=client)
     monkeypatch.setattr("klutch.actions.client", mock_client)
     return mock_client
+
+
+def get_mock_hpa(name="test-hpa", namespace="test-ns", min_repl=2, max_repl=10, current_repl=4, annotations=None):
+    mock_hpa = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
+    mock_hpa.metadata.name = name
+    mock_hpa.metadata.namespace = namespace
+    mock_hpa.spec.min_replicas = min_repl
+    mock_hpa.spec.max_replicas = max_repl
+    mock_hpa.status.current_replicas = current_repl
+    if annotations:
+        mock_hpa.metadata.annotations = annotations
+    return mock_hpa
 
 
 def test_find_triggers(mock_client):
@@ -86,3 +100,78 @@ def test_find_hpas(mock_client):
     found = actions.find_hpas(config)
 
     assert list(found) == [mock_hpa_enabled]
+
+
+@pytest.mark.parametrize(
+    "hpa_min_r, hpa_max_r, hpa_current_r, hpa_scale_perc, expected_min_r, expect_log, expected_exception",
+    [
+        (2, 10, 3, "200", 6, False, does_not_raise()),  # uses current, not min
+        (2, 10, 3, "150", 5, False, does_not_raise()),  # rounds up
+        (2, 10, 6, "200", 10, True, does_not_raise()),  # does not exceed maxReplicas
+        (2, 10, 0, "200", 0, False, pytest.raises(ValueError)),  # raise when would otherwise decrease
+        (2, 10, 2, "foobar", 0, False, pytest.raises(ValueError)),  # raise when not able to parse percentage
+        (2, 10, 2, None, 0, False, pytest.raises(TypeError)),  # raise when not able to parse percentage
+    ],
+)
+def test_scale_hpa_patches(
+    freezer,
+    mock_client,
+    hpa_min_r,
+    hpa_max_r,
+    hpa_current_r,
+    hpa_scale_perc,
+    expected_min_r,
+    expect_log,
+    expected_exception,
+):
+    freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
+    # Setting custom annotation key to test if config is used
+    config = get_config(["--namespace=test-ns"])
+    config.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
+    config.hpa_annotation_status = "kl-status"
+
+    mock_original_hpa = get_mock_hpa(
+        name="test-hpa",
+        namespace="test-ns",
+        min_repl=hpa_min_r,
+        max_repl=hpa_max_r,
+        current_repl=hpa_current_r,
+        annotations={"kl-scale-to": hpa_scale_perc},
+    )
+    mock_patched_hpa = get_mock_hpa()
+    mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
+
+    with expected_exception:
+        ret_value = actions.scale_hpa(config, mock_original_hpa)
+
+        expected_patch_body = {
+            "metadata": {
+                "annotations": {
+                    "kl-status": json.dumps(
+                        {
+                            "originalMinReplicas": hpa_min_r,
+                            "originalCurrentReplicas": hpa_current_r,
+                            "appliedMinReplicas": expected_min_r,
+                            "appliedAt": REFERENCE_TS,
+                        }
+                    )
+                }
+            },
+            "spec": {"minReplicas": expected_min_r},
+        }
+        mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
+            "test-hpa", "test-ns", expected_patch_body
+        )
+        assert ret_value is mock_patched_hpa
+
+
+def test_scale_hpa_raises_if_annotation_found(mock_client):
+    # Setting custom annotation key to test if config is used
+    config = get_config(["--namespace=test-ns"])
+    config.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
+    config.hpa_annotation_status = "kl-status"
+
+    mock_original_hpa = get_mock_hpa(annotations={"kl-status": "some-json", "kl-scale-to": "200"})
+
+    with pytest.raises(ValueError):
+        actions.scale_hpa(config, mock_original_hpa)
