@@ -109,7 +109,6 @@ def test_find_status(mock_client):
 
 
 def test_create_status(mock_client):
-    """TODO."""
     config = get_config(["--namespace=test-ns"])
     config.cm_status_name = "kl-status-name"
     config.cm_status_label_key = "kl-status"
@@ -132,6 +131,14 @@ def test_create_status(mock_client):
     assert call_args[0].args[1].metadata.labels.get("kl-status") == "yes"
     assert call_args[0].args[1].data.get("status") == json.dumps(status)
     assert resp is mock_response
+
+
+def test_evaluate_status_cooldown_expired():
+    pass
+
+
+def test_delete_status():
+    pass
 
 
 def test_find_hpas(mock_client):
@@ -225,3 +232,11 @@ def test_scale_hpa_raises_if_annotation_found(mock_client):
 
     with pytest.raises(ValueError):
         actions.scale_hpa(config, mock_original_hpa)
+
+
+def test_reconcile_hpa():
+    pass
+
+
+def test_revert_hpa():
+    pass

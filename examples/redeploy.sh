@@ -12,5 +12,6 @@ if [ -z "${NS}" ]; then
     exit 1
 fi
 
-kubectl delete -f ${DIR}/scaling-app-demo.yaml
-kubectl apply -f ${DIR}/scaling-app-demo.yaml
+kubectl -n ${NS} delete cm klutch-status
+kubectl -n ${NS} delete -f ${DIR}/scaling-app-demo.yaml
+kubectl -n ${NS} apply -f ${DIR}/scaling-app-demo.yaml

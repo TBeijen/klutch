@@ -12,7 +12,7 @@ class Config:
     debug = False
     dry_run = False
     interval = 10  # seconds
-    cooldown = 300  # seconds
+    cooldown = 30  # seconds
     trigger_max_age = 300  # seconds
     namespace = None
 

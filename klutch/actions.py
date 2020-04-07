@@ -20,7 +20,7 @@ def find_triggers(config: Config) -> List[client.models.v1_config_map.V1ConfigMa
     return sorted(resp.items, key=lambda n: n.metadata.creation_timestamp.timestamp(), reverse=True,)
 
 
-def validate_trigger(config: Config, trigger: client.models.v1_config_map.V1ConfigMap):
+def validate_trigger(config: Config, trigger: client.models.v1_config_map.V1ConfigMap) -> bool:
     """Evaluate trigger ConfigMap age, returning True if valid."""
     cm_ts = trigger.metadata.creation_timestamp.timestamp()
     now = datetime.now().timestamp()
@@ -47,6 +47,16 @@ def create_status(config, status: list):
         ),
     )
     return client.CoreV1Api().create_namespaced_config_map(config.namespace, config_map)
+
+
+def evaluate_status_cooldown_expired(config, status: client.models.v1_config_map.V1ConfigMap) -> bool:
+    cm_ts = status.metadata.creation_timestamp.timestamp()
+    now = datetime.now().timestamp()
+    return cm_ts + config.cooldown < now
+
+
+def delete_status(status: client.models.v1_config_map.V1ConfigMap):
+    return client.CoreV1Api().delete_namespaced_config_map(status.metadata.name, status.metadata.namespace)
 
 
 def find_hpas(config: Config,) -> Iterable[client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler]:
@@ -96,4 +106,63 @@ def scale_hpa(
         f"Scaled minReplicas from {spec_min_replicas} to {target_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"
     )
 
+    return patched_hpa
+
+
+def reconcile_hpa(
+    config: Config, name: str, namespace: str, klutch_hpa_status
+) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
+    """Examine hpa and ensure minReplicas has overdrive value and annotation is set."""
+    # load hpa first to determine if annotation hasn't been removed (will make patch fail)
+    patch = []
+    hpa = client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler(name, namespace)
+
+    if config.hpa_annotation_status not in hpa.metadata.annotations:
+        patch.append(
+            {
+                "op": "add",
+                "path": "/metadata/annotations/{}".format(config.hpa_annotation_status.replace("/", "~1")),
+                "value": json.dumps(klutch_hpa_status),
+            }
+        )
+    if hpa.spec.min_replicas != klutch_hpa_status.get("appliedMinReplicas"):
+        patch.append(
+            {"op": "replace", "path": "/spec/minReplicas", "value": klutch_hpa_status.get("appliedMinReplicas")}
+        )
+    if not patch:
+        logger.debug("No reconcile needed for hpa (name={}, namespace={})".format(name, namespace))
+        return hpa
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch)
+    logger.info("Reconciled hpa (name={}, namespace={})".format(name, namespace))
+    return patched_hpa
+
+
+def revert_hpa(
+    config: Config, name: str, namespace: str, klutch_hpa_status
+) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
+    """Restore minReplicas to original value and remove status annotation."""
+    # load hpa first to determine if annotation hasn't been removed (will make patch fail)
+    hpa = client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler(name, namespace)
+
+    patch = [
+        {"op": "replace", "path": "/spec/minReplicas", "value": klutch_hpa_status.get("originalMinReplicas")},
+    ]
+    if config.hpa_annotation_status in hpa.metadata.annotations:
+        patch.append(
+            {
+                "op": "remove",
+                "path": "/metadata/annotations/{}".format(config.hpa_annotation_status.replace("/", "~1")),
+            }
+        )
+
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch)
+    logger.info(
+        "Scaled minReplicas from {applied_min_replicas} to {original_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})".format(
+            name=name,
+            namespace=namespace,
+            uid=patched_hpa.metadata.uid,
+            applied_min_replicas=klutch_hpa_status.get("appliedMinReplicas"),
+            original_min_replicas=klutch_hpa_status.get("originalMinReplicas"),
+        )
+    )
     return patched_hpa

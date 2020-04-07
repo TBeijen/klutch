@@ -5,19 +5,40 @@ Klutch
 
 
 
+Resources
+---------
 
+Kubernetes Python SDK
+* https://github.com/kubernetes-client/python/tree/master/kubernetes#documentation-for-api-endpoints
+
+JSON patch
+* https://tools.ietf.org/html/rfc6902
+* http://jsonpatch.com/#json-pointer
 
 
 TODO
 ----
 - [DONE] Finding own/current namespace
 - Alternate scale targets (absolute numbers, perc. of min.)
+- Remove or implement `--dry-run`.
 - How is listing objects affected by having limited RBAC permissions?
 - Parallelism (webserver for triggers, control loop, metrics server)
 - e2e testing (kind?)
-- Triggers via AWS SNS
+- Triggers via AWS SQS
 - Notifications (Slack)
 - Golang?
+
+Running sample
+--------------
+
+Pick or create a namespace.
+
+```sh
+examples/redeploy.sh --namespace=<demo-namespace>
+
+python -m klutch --namespace=<demo-namespace>
+```
+
 
 Development setup
 -----------------

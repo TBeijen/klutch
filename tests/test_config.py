@@ -12,7 +12,7 @@ def test_config_defaults():
     assert config.debug is False
     assert config.dry_run is False
     assert config.interval == 10
-    assert config.cooldown == 300
+    assert config.cooldown == 30  # TODO: set back to 300
     assert config.trigger_max_age == 300
     assert config.cm_trigger_label_key == "klutch.it/trigger"
     assert config.cm_trigger_label_value == "1"
