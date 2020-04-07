@@ -18,6 +18,7 @@ class Config:
 
     cm_trigger_label_key = "klutch.it/trigger"
     cm_trigger_label_value = "1"
+    cm_status_name = "klutch-status"
     cm_status_label_key = "klutch.it/status"
     cm_status_label_value = "1"
     hpa_annotation_enabled = "klutch.it/enabled"
@@ -30,9 +31,7 @@ class Config:
         if args.namespace:
             self.namespace = args.namespace
         else:
-            self.namespace = open(
-                "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-            ).read()
+            self.namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
 
 
 def _get_args(args):

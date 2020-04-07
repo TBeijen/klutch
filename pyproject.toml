@@ -18,6 +18,9 @@ pyfakefs = "^4.0.2"
 pytest-freezegun = "^0.4.1"
 mypy = "^0.770"
 
+[tool.black]
+line-length = 118
+
 [mypy]
 # suppressing the no [mypy] section warning
 

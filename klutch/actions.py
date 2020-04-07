@@ -15,16 +15,9 @@ logger = logging.getLogger(__name__)
 def find_triggers(config: Config) -> List[client.models.v1_config_map.V1ConfigMap]:
     """Find any configmap labeled as trigger and return it. Recent first."""
     resp = client.CoreV1Api().list_namespaced_config_map(
-        config.namespace,
-        label_selector="{}={}".format(
-            config.cm_trigger_label_key, config.cm_trigger_label_value,
-        ),
+        config.namespace, label_selector="{}={}".format(config.cm_trigger_label_key, config.cm_trigger_label_value,),
     )
-    return sorted(
-        resp.items,
-        key=lambda n: n.metadata.creation_timestamp.timestamp(),
-        reverse=True,
-    )
+    return sorted(resp.items, key=lambda n: n.metadata.creation_timestamp.timestamp(), reverse=True,)
 
 
 def validate_trigger(config: Config, trigger: client.models.v1_config_map.V1ConfigMap):
@@ -35,37 +28,33 @@ def validate_trigger(config: Config, trigger: client.models.v1_config_map.V1Conf
 
 
 def delete_trigger(trigger: client.models.v1_config_map.V1ConfigMap):
-    return client.CoreV1Api().delete_namespaced_config_map(
-        trigger.metadata.name, trigger.metadata.namespace
+    return client.CoreV1Api().delete_namespaced_config_map(trigger.metadata.name, trigger.metadata.namespace)
+
+
+def create_status(config, status: list):
+    config_map = client.models.v1_config_map.V1ConfigMap(
+        data={"status": json.dumps(status)},
+        metadata=client.models.V1ObjectMeta(
+            name=config.cm_status_name, labels={config.cm_status_label_key: config.cm_status_label_value},
+        ),
     )
+    return client.CoreV1Api().create_namespaced_config_map(config.namespace, config_map)
 
 
-def find_hpas(
-    config: Config,
-) -> Iterable[client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler]:
+def find_hpas(config: Config,) -> Iterable[client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler]:
     """Find any HorizontalPodAutoscaler having klutch annotation."""
     resp = client.AutoscalingV1Api().list_horizontal_pod_autoscaler_for_all_namespaces()
-    return filter(
-        lambda h: config.hpa_annotation_enabled in h.metadata.annotations, resp.items
-    )
+    return filter(lambda h: config.hpa_annotation_enabled in h.metadata.annotations, resp.items)
 
 
 def scale_hpa(
-    config: Config,
-    hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler,
+    config: Config, hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler,
 ) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
-    """Scale up hpa. Write status in annotation."""
-    try:
-        scale_perc_of_actual = int(
-            hpa.metadata.annotations.get(config.hpa_annotation_scale_perc_of_actual)
-        )
-    except (ValueError, TypeError):
-        logger.warning(
-            "Could not determine scale target of HorizontalPodAutoscaler (namespace={}, name={}, uid={})".format(
-                hpa.metadata.namespace, hpa.metadata.name, hpa.metadata.uid
-            )
-        )
-        return
+    """Scale up hpa. Write status in annotation. Return patched hpa."""
+    # Raises ValueError or TypeError if value can not pe parsed into int
+    scale_perc_of_actual = int(hpa.metadata.annotations.get(config.hpa_annotation_scale_perc_of_actual))
+    if hpa.metadata.annotations.get(config.hpa_annotation_status):
+        raise ValueError("Can not scale up HPA. Already has been scaled up.")
 
     # values used in patching and logging
     name = hpa.metadata.name
@@ -73,9 +62,10 @@ def scale_hpa(
     uid = hpa.metadata.uid
     spec_min_replicas = hpa.spec.min_replicas
     spec_max_replicas = hpa.spec.max_replicas
-    target_min_replicas = math.ceil(
-        hpa.status.current_replicas * scale_perc_of_actual / 100
-    )
+    target_min_replicas = math.ceil(hpa.status.current_replicas * scale_perc_of_actual / 100)
+
+    if target_min_replicas <= spec_min_replicas:
+        raise ValueError("Can not scale up HPA, would decrease minReplicas (deployment not correctly started?).")
 
     if target_min_replicas > spec_max_replicas:
         logger.warning(
@@ -93,9 +83,7 @@ def scale_hpa(
         "metadata": {"annotations": {config.hpa_annotation_status: json.dumps(status)}},
         "spec": {"minReplicas": target_min_replicas},
     }
-    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(
-        name, namespace, patch,
-    )
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch,)
     logger.info(
         f"Scaled minReplicas from {spec_min_replicas} to {target_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"
     )

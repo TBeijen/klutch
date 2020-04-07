@@ -27,9 +27,7 @@ def process_triggers(config: Config):
 
     trigger_cm = trigger_cm_list.pop(0)
     if trigger_cm_list:
-        logger.warning(
-            "More than one trigger found. Using most recent. Removing others."
-        )
+        logger.warning("More than one trigger found. Using most recent. Removing others.")
         for t in trigger_cm_list:
             actions.delete_trigger(t)
 
@@ -43,26 +41,33 @@ def process_triggers(config: Config):
         return False
 
     logger.info(
-        "Processing trigger ConfigMap (name={}, uid={})".format(
-            trigger_cm.metadata.name, trigger_cm.metadata.uid,
-        )
+        "Processing trigger ConfigMap (name={}, uid={})".format(trigger_cm.metadata.name, trigger_cm.metadata.uid,)
     )
     status = []
     for hpa in actions.find_hpas(config):
-        patched_hpa = actions.scale_hpa(config, hpa)
-        patched_hpa_status = json.loads(
-            patched_hpa.metadata.annotations.get(config.hpa_annotation_status)
+        try:
+            patched_hpa = actions.scale_hpa(config, hpa)
+            patched_hpa_status = json.loads(patched_hpa.metadata.annotations.get(config.hpa_annotation_status))
+            entry = {
+                "name": patched_hpa.metadata.name,
+                "namespace": patched_hpa.metadata.namespace,
+                "status": patched_hpa_status,
+            }
+            status.append(entry)
+        except Exception as e:
+            # Allow other hpas to be processed on any (un)expected error
+            logger.error(
+                "Error while scaling up HorizontalPodAutoscaler (namespace={ns}, name={name}, uid={uid}). Reason: {err}".format(
+                    ns=hpa.metadata.namespace, name=hpa.metadata.name, uid=hpa.metadata.uid, err=str(e),
+                )
+            )
+    created_status_cm = actions.create_status(config, status)
+    actions.delete_trigger(trigger_cm)
+    logger.info(
+        "Finished updating {} HorizontalPodAutoscalers. Status written to ConfigMap (name={}, uid={})".format(
+            len(status), created_status_cm.metadata.name, created_status_cm.metadata.uid
         )
-        entry = {
-            "name": patched_hpa.metadata.name,
-            "namespace": patched_hpa.metadata.namespace,
-            "status": patched_hpa_status,
-        }
-        status.append(entry)
-        pass
-
-    # TODO: Write status
-    # TODO: Delete trigger
+    )
 
     return True
 

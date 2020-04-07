@@ -47,11 +47,7 @@ def test_find_triggers(mock_client):
         (datetime.fromtimestamp(REFERENCE_TS), 100, True),
         (datetime.fromtimestamp(REFERENCE_TS - 100), 100, True),
         (datetime.fromtimestamp(REFERENCE_TS - 200), 100, False),
-        (
-            datetime.fromtimestamp(REFERENCE_TS + 100),
-            100,
-            True,
-        ),  # 'future' configmaps should be no problem
+        (datetime.fromtimestamp(REFERENCE_TS + 100), 100, True,),  # 'future' configmaps should be no problem
     ],
 )
 def test_validate_trigger(freezer, creation_timestamp, trigger_max_age, expected):
@@ -71,19 +67,13 @@ def test_delete_trigger(mock_client):
 
     actions.delete_trigger(mock_cm)
 
-    mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with(
-        "foo-name", "bar-ns"
-    )
+    mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
 def test_find_hpas(mock_client):
-    mock_hpa_enabled = MagicMock(
-        spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler
-    )
+    mock_hpa_enabled = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
     mock_hpa_enabled.metadata.annotations = {"klutch-enabled": "any-value-goes"}
-    mock_hpa_disabled = MagicMock(
-        spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler
-    )
+    mock_hpa_disabled = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
     mock_hpa_disabled.metadata.annotations = {}
 
     config = get_config(["--namespace=test-ns"])
@@ -91,9 +81,7 @@ def test_find_hpas(mock_client):
 
     mock_hpa_list = MagicMock()
     mock_hpa_list.items = [mock_hpa_disabled, mock_hpa_enabled]
-    mock_client.AutoscalingV1Api().list_horizontal_pod_autoscaler_for_all_namespaces.return_value = (
-        mock_hpa_list
-    )
+    mock_client.AutoscalingV1Api().list_horizontal_pod_autoscaler_for_all_namespaces.return_value = mock_hpa_list
 
     found = actions.find_hpas(config)
 
