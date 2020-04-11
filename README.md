@@ -10,6 +10,7 @@ Resources
 
 Kubernetes Python SDK
 * https://github.com/kubernetes-client/python/tree/master/kubernetes#documentation-for-api-endpoints
+* https://github.com/kubernetes-client/python/tree/master/examples
 
 JSON patch
 * https://tools.ietf.org/html/rfc6902

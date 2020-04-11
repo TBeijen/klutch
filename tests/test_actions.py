@@ -133,12 +133,33 @@ def test_create_status(mock_client):
     assert resp is mock_response
 
 
-def test_evaluate_status_cooldown_expired():
-    pass
+@pytest.mark.parametrize(
+    "creation_timestamp, cooldown, expected",
+    [
+        (datetime.fromtimestamp(REFERENCE_TS), 300, False),
+        (datetime.fromtimestamp(REFERENCE_TS - 300), 300, False),
+        (datetime.fromtimestamp(REFERENCE_TS - 301), 300, True),
+        (datetime.fromtimestamp(REFERENCE_TS + 100), 300, False,),  # 'future' configmaps should be no problem
+    ],
+)
+def test_evaluate_status_cooldown_expired(freezer, creation_timestamp, cooldown, expected):
+    freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
+    mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
+    mock_cm.metadata.creation_timestamp = creation_timestamp
+    config = get_config(["--namespace=test-ns"])
+    config.cooldown = cooldown
+
+    assert actions.evaluate_status_cooldown_expired(config, mock_cm) == expected
 
 
-def test_delete_status():
-    pass
+def test_delete_status(mock_client):
+    mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
+    mock_cm.metadata.name = "foo-name"
+    mock_cm.metadata.namespace = "bar-ns"
+
+    actions.delete_status(mock_cm)
+
+    mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
 def test_find_hpas(mock_client):
