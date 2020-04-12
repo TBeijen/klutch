@@ -259,5 +259,30 @@ def test_reconcile_hpa():
     pass
 
 
-def test_revert_hpa():
-    pass
+@pytest.mark.parametrize("has_patch_annotation", [True, False])
+def test_revert_hpa_patches(mock_client, has_patch_annotation):
+    config = get_config(["--namespace=test-ns"])
+    config.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
+
+    hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
+    mock_read_hpa = get_mock_hpa(annotations=hpa_annot)
+    mock_patched_hpa = get_mock_hpa()
+    mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.return_value = mock_read_hpa
+    mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
+
+    ret_value = actions.revert_hpa(config, "test-name", "test-ns", {"originalMinReplicas": 4})
+
+    # should have loaded hpa using name and ns
+    mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
+        "test-name", "test-ns"
+    )
+    # should have patched hpa with proper patch
+    assert len(mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list) == 1
+    assert ret_value is mock_patched_hpa
+    args = mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list[0].args
+    assert args[0] == "test-name"
+    assert args[1] == "test-ns"
+    assert {"op": "replace", "path": "/spec/minReplicas", "value": 4} in args[2]
+    assert len(args[2]) == 2 if has_patch_annotation else 1
+    if has_patch_annotation:
+        assert {"op": "remove", "path": "/metadata/annotations/kl~1status"} in args[2]
