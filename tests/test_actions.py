@@ -255,8 +255,42 @@ def test_scale_hpa_raises_if_annotation_found(mock_client):
         actions.scale_hpa(config, mock_original_hpa)
 
 
-def test_reconcile_hpa():
-    pass
+@pytest.mark.parametrize(
+    "has_patch_annotation, hpa_min_replicas, should_patch",
+    [
+        (True, 4, False),
+        (True, 2, True),
+        (False, 4, True),
+        (False, 2, True),
+        (False, 6, True),  # Also reconcile if for some odd reason minReplicas is higher than appliedMinReplicas
+    ],
+)
+def test_reconcile_hpa_patches(mock_client, has_patch_annotation, hpa_min_replicas, should_patch):
+    config = get_config(["--namespace=test-ns"])
+    config.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
+
+    hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
+    mock_read_hpa = get_mock_hpa(annotations=hpa_annot, min_repl=hpa_min_replicas)
+    mock_patched_hpa = get_mock_hpa()
+    mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.return_value = mock_read_hpa
+    mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
+
+    ret_value = actions.reconcile_hpa(config, "test-name", "test-ns", {"appliedMinReplicas": 4})
+
+    patch_annot = {"op": "add", "path": "/metadata/annotations/kl~1status", "value": '{"appliedMinReplicas": 4}'}
+    patch_spec = {"op": "replace", "path": "/spec/minReplicas", "value": 4}
+
+    if not should_patch:
+        mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_not_called()
+        assert ret_value is mock_read_hpa
+    else:
+        assert len(mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list) == 1
+        assert ret_value is mock_patched_hpa
+        args = mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list[0].args
+        assert args[0] == "test-name"
+        assert args[1] == "test-ns"
+        assert (patch_annot in args[2]) is not has_patch_annotation
+        assert (patch_spec in args[2]) is not (hpa_min_replicas == 4)
 
 
 @pytest.mark.parametrize("has_patch_annotation", [True, False])
