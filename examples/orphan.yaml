@@ -1,37 +1,20 @@
 ---
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: klutch-trigger-1
-  labels:
-    klutch.it/trigger: "1"
-data: {}
-
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: klutch-trigger-2
-  labels:
-    klutch.it/trigger: "1"
-data: {}
-
----
+# Add this deployment and hpa to test scanning and reverting of 'orphaned' hpas
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: klutch-deployment
+  name: klutch-orphan-deployment
 spec:
   replicas: 2
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      app.kubernetes.io/instance: klutch-test
+      app.kubernetes.io/instance: klutch-test-orphan
       app.kubernetes.io/name: klutch-depoyment
   template:
     metadata:
       labels:
-        app.kubernetes.io/instance: klutch-test
+        app.kubernetes.io/instance: klutch-test-orphan
         app.kubernetes.io/name: klutch-depoyment
     spec:
       containers:
@@ -62,12 +45,13 @@ metadata:
   annotations:
     klutch.it/enabled: "1"
     klutch.it/scale-percentage-of-actual: "200"
-  name: klutch-hpa
+    klutch.it/status: '{"originalMinReplicas": 2, "originalCurrentReplicas": 2, "appliedMinReplicas": 3, "appliedAt": 1588015000}'
+  name: klutch-orphan-hpa
 spec:
   maxReplicas: 10
-  minReplicas: 2
+  minReplicas: 3
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: klutch-deployment
+    name: klutch-orphan-deployment
   targetCPUUtilizationPercentage: 70

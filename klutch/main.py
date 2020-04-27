@@ -1,5 +1,5 @@
 import logging
-from time import sleep
+import time
 
 from klutch.config import configure_kubernetes
 from klutch.config import get_config
@@ -23,6 +23,7 @@ def main(args=None):
 
 def control_loop(config):
     handler = ExitHandler()
+    last_orphan_scan = int(time.time())
     while True:
         try:
             # client = get_kubernetes()
@@ -34,9 +35,12 @@ def control_loop(config):
             if not is_ongoing:
                 is_ongoing = process_triggers(config)
             if not is_ongoing:
-                process_orphans(config)
+                now = int(time.time())
+                if now - last_orphan_scan > config.orphan_scan_interval:
+                    last_orphan_scan = now
+                    process_orphans(config)
         except Exception as e:
             logger.exception("An error occured: %s", e)
 
         with handler.safe_exit():
-            sleep(config.interval)
+            time.sleep(config.interval)

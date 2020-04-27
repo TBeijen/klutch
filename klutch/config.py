@@ -12,8 +12,9 @@ class Config:
     debug = False
     dry_run = False
     interval = 10  # seconds
-    cooldown = 30  # seconds
+    cooldown = 30  # seconds -> 300
     trigger_max_age = 300  # seconds
+    orphan_scan_interval = 30  # seconds -> 600
     namespace = None
 
     cm_trigger_label_key = "klutch.it/trigger"

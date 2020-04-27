@@ -143,3 +143,19 @@ def process_orphans(config: Config):
     Returns:
         bool: Whether or not there is a sequence ongoing
     """
+    logger.info("Searching for orphan HorizontalPodAutoscalers that need to be reverted.")
+    if actions.find_status(config=config):
+        raise RuntimeError("Can not process orphans if status exists.")
+    for hpa in actions.find_hpas(config):
+        if config.hpa_annotation_status in hpa.metadata.annotations:
+            name = hpa.metadata.name
+            ns = hpa.metadata.namespace
+            logger.warning(
+                f"Found HorizontalPodAutoscaler (namespace={ns}, name={name}) having status annotation, reverting."
+            )
+            actions.revert_hpa(
+                config=config,
+                name=name,
+                namespace=ns,
+                klutch_hpa_status=json.loads(hpa.metadata.annotations.get(config.hpa_annotation_status)),
+            )
