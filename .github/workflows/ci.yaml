@@ -22,7 +22,10 @@ jobs:
       - name: Configure Poetry
         run: |
           source $HOME/.poetry/env
+          poetry config --list
+          poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
+          poetry config --list
 
       - name: Configure pre-commit
         run: echo '::set-env name=PRE_COMMIT_HOME::.pre-commit-cache'
