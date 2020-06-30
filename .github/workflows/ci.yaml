@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: .venv
-          key: venv-python-3.8-${{ hashFiles('**/poetry.lock') }}
+          key: venv-python-38-${{ hashFiles('**/poetry.lock') }}
 
       - name: Set up pre-commit cache
         uses: actions/cache@v1
