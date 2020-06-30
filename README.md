@@ -1,9 +1,9 @@
 Klutch
 ======
 
+![](https://github.com/tbeijen/klutch/workflows/CI%2FCD/badge.svg)
+
 > Putting your HPAs into overdrive
-
-
 
 Resources
 ---------
@@ -22,8 +22,13 @@ TODO
 - [DONE] Finding own/current namespace
 - Alternate scale targets (absolute numbers, perc. of min.)
 - Remove or implement `--dry-run`.
-- How is listing objects affected by having limited RBAC permissions?
+- CI/CD: Build helm chart
+- CI/CD: Make publish job as a whole skipped via if (not the individual build step)
+- CI/CD: Allow publish only from master.
+- [DONE] --How is listing objects affected by having limited RBAC permissions?-- gives error, no surprises there.
 - Parallelism (webserver for triggers, control loop, metrics server)
+- metrics
+- POST api endpoint
 - e2e testing (kind?)
 - Triggers via AWS SQS
 - Notifications (Slack)
@@ -51,6 +56,7 @@ poetry env use -vvvv ~/.pyenv/versions/3.8.2/bin/python3.8
 
 poetry install
 poetry shell
+pre-commit install
 
 python -m klutch --dry-run
 ```
@@ -91,7 +97,7 @@ Test option (lab flask icon) should appear in left bar.
 
 ```json
 {
-    "python.pythonPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.8"
+    "python.pythonPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.8",
     "python.testing.pytestArgs": [
         "tests"
     ],
@@ -120,3 +126,11 @@ Add to `.vscode/launch.json` (under `configurations`):
             "justMyCode": false,
         }
 ```
+
+Github workflow
+---------------
+
+Workflow using Github actions
+
+- Job test: Runs on all commits
+- Job publish: Runs on tags only
