@@ -40,16 +40,25 @@ jobs:
         uses: dschep/install-poetry-action@v1.3
 
       # Based on: https://github.com/python-poetry/poetry/actions/runs/30094511/workflow
-      - name: Set up Poetry
+      - name: Configure Poetry
         run: |
           source $HOME/.poetry/env
           poetry config virtualenvs.in-project true
 
-      - name: Set up cache
+      - name: Configure pre-commit
+        run: echo '::set-env name=PRE_COMMIT_HOME::.pre-commit-cache'
+
+      - name: Set up Poetry cache
         uses: actions/cache@v1
         with:
           path: .venv
           key: venv-python-3.8-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Set up pre-commit cache
+        uses: actions/cache@v1
+        with:
+          path: .pre-commit-cache
+          key: pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
 
       - name: Install dependencies
         run: |
