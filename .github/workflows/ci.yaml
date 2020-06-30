@@ -1,11 +1,13 @@
-name: CI
+name: CI/CD
 
 on: [push, pull_request]
 
 jobs:
+
   test:
     runs-on: ubuntu-latest
     steps:
+
       - uses: actions/checkout@v1
         with:
           fetch-depth: 1
@@ -48,3 +50,24 @@ jobs:
 
       - name: Linting and tests
         run: poetry run pre-commit run --all-files
+
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - name: Check if git tag exists
+        run: echo "::set-env name=HEAD_TAG::$(git tag --points-at HEAD)"
+
+      - name: Publish docker image
+        if: env.HEAD_TAG != ''
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: tbeijen/klutch
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          tags: "latest,${{ env.HEAD_TAG }}"
+          buildargs: "VERSION=${{ env.HEAD_TAG }}"
