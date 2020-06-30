@@ -22,4 +22,4 @@ ARG VERSION=dev
 
 RUN sed -i "s/__version__ = .*/__version__ = '${VERSION}'/" /klutch/__init__.py
 
-ENTRYPOINT ["python3", "-m", "kube_janitor"]
+ENTRYPOINT ["python3", "-m", "klutch"]
