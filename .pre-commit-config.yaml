@@ -41,6 +41,10 @@ repos:
       - id: pydocstyle
         args: ["--ignore=D10,D21,D202,D406,D407,D408,D409,D413"]
 
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: helmlint
 
   - repo: local
     hooks:
