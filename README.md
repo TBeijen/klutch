@@ -17,23 +17,6 @@ JSON patch
 * http://jsonpatch.com/#json-pointer
 
 
-TODO
-----
-- [DONE] Finding own/current namespace
-- Alternate scale targets (absolute numbers, perc. of min.)
-- Remove or implement `--dry-run`.
-- CI/CD: Build helm chart
-- CI/CD: Make publish job as a whole skipped via if (not the individual build step)
-- CI/CD: Allow publish only from master.
-- [DONE] --How is listing objects affected by having limited RBAC permissions?-- gives error, no surprises there.
-- Parallelism (webserver for triggers, control loop, metrics server)
-- metrics
-- POST api endpoint
-- e2e testing (kind?)
-- Triggers via AWS SQS
-- Notifications (Slack)
-- Golang?
-
 Running sample
 --------------
 
