@@ -1,0 +1,48 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: klutch-consumer-example
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: klutch-consumer-example
+      app.kubernetes.io/name: klutch-consumer-deployment
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: klutch-consumer-example
+        app.kubernetes.io/name: klutch-consumer-deployment
+    spec:
+      containers:
+      - image: gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5
+        imagePullPolicy: IfNotPresent
+        name: consumer
+        command: ["/bin/dash", "-c"]
+        args: ["while true; do /consume-cpu/consume-cpu -millicores 200 -duration-sec 60; done"]
+        resources:
+          limits:
+            cpu: 400m
+            memory: 100Mi
+          requests:
+            cpu: 300m
+            memory: 10Mi
+
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    klutch.it/enabled: "1"
+    klutch.it/scale-percentage-of-actual: "400"
+  name: klutch-consumer-example
+spec:
+  maxReplicas: 10
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: klutch-consumer-example
+  targetCPUUtilizationPercentage: 70
