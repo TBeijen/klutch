@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: klutch-consumer-example
 spec:
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 5
   selector:
     matchLabels:
@@ -20,8 +20,10 @@ spec:
       - image: gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5
         imagePullPolicy: IfNotPresent
         name: consumer
-        command: ["/bin/dash", "-c"]
-        args: ["while true; do /consume-cpu/consume-cpu -millicores 200 -duration-sec 60; done"]
+        ports:
+          - name: http
+            containerPort: 8080
+            protocol: TCP
         resources:
           limits:
             cpu: 400m
@@ -36,13 +38,53 @@ kind: HorizontalPodAutoscaler
 metadata:
   annotations:
     klutch.it/enabled: "1"
-    klutch.it/scale-percentage-of-actual: "400"
+    klutch.it/scale-percentage-of-actual: "1000"
   name: klutch-consumer-example
 spec:
   maxReplicas: 10
-  minReplicas: 2
+  minReplicas: 1
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: klutch-consumer-example
   targetCPUUtilizationPercentage: 70
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: klutch-consumer-example
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/instance: klutch-consumer-example
+    app.kubernetes.io/name: klutch-consumer-deployment
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: klutch-consumer-example-generator
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: klutch-consumer-example
+      app.kubernetes.io/name: generator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: klutch-consumer-example
+        app.kubernetes.io/name: generator
+    spec:
+      containers:
+      - image: curlimages/curl:7.71.0
+        imagePullPolicy: IfNotPresent
+        name: generator
+        args: ["sh", "-c", "while true; do curl http://klutch-consumer-example:8080/ConsumeCPU -s --data \"millicores=200&durationSec=120\" && sleep 121s; done"]
