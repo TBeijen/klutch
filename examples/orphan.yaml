@@ -1,21 +1,25 @@
 ---
-# Add this deployment and hpa to test scanning and reverting of 'orphaned' hpas
+# Add this deployment and hpa to test scanning and reverting of 'orphaned' hpas.
+# Orphaned meaning: No sequence ongoing, however hpa having annotation indicating it should have been reverted.
+#
+# This obviouosly should not occur, but things can go wrong, e.g. a status configmap can accidentally be deleted.
+#
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: klutch-orphan-deployment
+  name: klutch-example-orphan
 spec:
   replicas: 2
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      app.kubernetes.io/instance: klutch-test-orphan
-      app.kubernetes.io/name: klutch-depoyment
+      app.kubernetes.io/instance: klutch-example
+      app.kubernetes.io/name: orphan
   template:
     metadata:
       labels:
-        app.kubernetes.io/instance: klutch-test-orphan
-        app.kubernetes.io/name: klutch-depoyment
+        app.kubernetes.io/instance: klutch-example
+        app.kubernetes.io/name: orphan
     spec:
       containers:
       - image: rancher/hello-world:v0.1.2
@@ -46,12 +50,12 @@ metadata:
     klutch.it/enabled: "1"
     klutch.it/scale-percentage-of-actual: "200"
     klutch.it/status: '{"originalMinReplicas": 2, "originalCurrentReplicas": 2, "appliedMinReplicas": 3, "appliedAt": 1588015000}'
-  name: klutch-orphan-hpa
+  name: klutch-example-orphan
 spec:
   maxReplicas: 10
   minReplicas: 3
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: klutch-orphan-deployment
+    name: klutch-example-orphan
   targetCPUUtilizationPercentage: 70
