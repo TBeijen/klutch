@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "klutch-example.fullname" . }}-generator
+  labels:
+    {{- include "klutch-example.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "klutch-example.name" . }}
+      app.kubernetes.io/instance: generator
+  template:
+    metadata:
+    {{- with .Values.common.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        app.kubernetes.io/name: {{ include "klutch-example.name" . }}
+        app.kubernetes.io/instance: generator
+    spec:
+      {{- with .Values.common.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.common.podSecurityContext | nindent 8 }}
+      containers:
+        - name: app
+          securityContext:
+            {{- toYaml .Values.common.securityContext | nindent 12 }}
+          image: "{{ .Values.generator.image.repository }}:{{ .Values.generator.image.tag }}"
+          imagePullPolicy: {{ .Values.generator.image.pullPolicy }}
+          args:
+            - "sh"
+            - "-c"
+            - "while true; do curl http://{{ include "klutch-example.name" . }}-app:8080/ConsumeCPU -s --data \"millicores={{ .Values.generator.config.millicores }}&durationSec={{ .Values.generator.config.duration }}\" && sleep {{ .Values.generator.config.interval }}s; done"
+          resources:
+            {{- toYaml .Values.generator.resources | nindent 12 }}
+      {{- with .Values.common.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.common.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.common.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

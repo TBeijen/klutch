@@ -1,0 +1,62 @@
+# The app that scales up/down and consumes CPU
+app:
+  image:
+    repository: gcr.io/kubernetes-e2e-test-images/resource-consumer
+    pullPolicy: IfNotPresent
+    tag: "1.5"
+  resources:
+    limits:
+      cpu: 400m
+      memory: 50Mi
+    requests:
+      cpu: 300m
+      memory: 10Mi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  klutchScalePercentageOfActual: 1000
+
+
+# Generates load on app, by curl into one of the pods, triggering CPU usage
+generator:
+  image:
+    repository: curlimages/curl
+    pullPolicy: IfNotPresent
+    tag: "7.71.0"
+  resources: {}
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  config:
+    millicores: 200
+    duration: 120
+    interval: 125  # Probably best have small 'gaps' than short periods of double CPU load
+
+
+common:
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+  podAnnotations: {}
+
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}

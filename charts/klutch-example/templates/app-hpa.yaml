@@ -1,0 +1,21 @@
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "klutch-example.fullname" . }}-app
+  labels:
+    {{- include "klutch-example.labels" . | nindent 4 }}
+  annotations:
+    klutch.it/enabled: "1"
+    klutch.it/scale-percentage-of-actual: "{{ .Values.app.klutchScalePercentageOfActual }}"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "klutch-example.fullname" . }}-app
+  minReplicas: {{ .Values.app.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.app.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ .Values.app.autoscaling.targetCPUUtilizationPercentage }}
