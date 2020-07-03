@@ -49,10 +49,10 @@ def create_status(config, status: list):
     return client.CoreV1Api().create_namespaced_config_map(config.namespace, config_map)
 
 
-def evaluate_status_cooldown_expired(config, status: client.models.v1_config_map.V1ConfigMap) -> bool:
+def evaluate_status_duration_expired(config, status: client.models.v1_config_map.V1ConfigMap) -> bool:
     cm_ts = status.metadata.creation_timestamp.timestamp()
     now = datetime.now().timestamp()
-    return cm_ts + config.cooldown < now
+    return cm_ts + config.duration < now
 
 
 def delete_status(status: client.models.v1_config_map.V1ConfigMap):

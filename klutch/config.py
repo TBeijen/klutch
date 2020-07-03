@@ -10,11 +10,10 @@ logger = logging.getLogger(__name__)
 class Config:
 
     debug = False
-    dry_run = False
-    interval = 10  # seconds
-    cooldown = 30  # seconds -> 300
+    interval = 5  # seconds
+    duration = 300  # seconds
     trigger_max_age = 300  # seconds
-    orphan_scan_interval = 30  # seconds -> 600
+    orphan_scan_interval = 600  # seconds
     namespace = None
 
     cm_trigger_label_key = "klutch.it/trigger"
@@ -28,7 +27,6 @@ class Config:
 
     def __init__(self, args):
         self.debug = args.debug
-        self.dry_run = args.dry_run
         if args.namespace:
             self.namespace = args.namespace
         else:
@@ -41,11 +39,8 @@ def _get_args(args):
         "--debug", help="Debug mode", action="store_true",
     )
     parser.add_argument(
-        "--dry-run", help="Do not change anything", action="store_true",
-    )
-    parser.add_argument(
         "--namespace",
-        help="Namespace to store status in. By default will use the namespace klutch is deployed in. (Required when running out of cluster)",
+        help="Namespace to look for triggers and store status in. By default will use the namespace klutch is deployed in. (Required when running out of cluster)",
     )
     return parser.parse_args(args)
 

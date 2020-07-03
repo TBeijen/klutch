@@ -98,7 +98,7 @@ def process_ongoing(config: Config):
         logger.warning("More than one status ConfigMap found. Using most recent. Ignoring others.")
 
     scaled_hpas = json.loads(status_cm.data.get("status"))
-    if not actions.evaluate_status_cooldown_expired(config, status_cm):
+    if not actions.evaluate_status_duration_expired(config, status_cm):
         logger.info("Sequence ongoing. Reconciling HPAs.")
         for h in scaled_hpas:
             name = h.get("name")
@@ -115,7 +115,7 @@ def process_ongoing(config: Config):
                 )
         return True
     else:
-        logger.info("Sequence cooldown expired. Reverting HPAs.")
+        logger.info("Sequence duration expired. Reverting HPAs.")
         for h in scaled_hpas:
             name = h.get("name")
             namespace = h.get("namespace")

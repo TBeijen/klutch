@@ -10,10 +10,10 @@ def test_config_defaults():
     config = get_config(["--namespace=my-namespace"])
     assert config.namespace == "my-namespace"
     assert config.debug is False
-    assert config.dry_run is False
-    assert config.interval == 10
-    assert config.cooldown == 30  # TODO: set back to 300
+    assert config.interval == 5
+    assert config.duration == 300
     assert config.trigger_max_age == 300
+    assert config.orphan_scan_interval == 600
     assert config.cm_trigger_label_key == "klutch.it/trigger"
     assert config.cm_trigger_label_value == "1"
     assert config.cm_status_label_key == "klutch.it/status"
@@ -23,18 +23,16 @@ def test_config_defaults():
 
 
 @pytest.mark.parametrize(
-    "args, exp_debug, exp_dry_run, exp_namespace",
+    "args, exp_debug, exp_namespace",
     [
-        (["--debug", "--namespace=foo"], True, False, "foo"),
-        (["--dry-run", "--namespace=foo"], False, True, "foo"),
-        (["--dry-run", "--namespace=foo", "--debug"], True, True, "foo"),
-        (["--namespace=foo", "--dry-run"], False, True, "foo"),
+        (["--debug", "--namespace=foo"], True, "foo"),
+        (["--namespace=foo"], False, "foo"),
+        (["--namespace=foo", "--debug"], True, "foo"),
     ],
 )
-def test_config_args(args, exp_debug, exp_dry_run, exp_namespace):
+def test_config_args(args, exp_debug, exp_namespace):
     config = get_config(args)
     assert config.debug == exp_debug
-    assert config.dry_run == exp_dry_run
     assert config.namespace == exp_namespace
 
 

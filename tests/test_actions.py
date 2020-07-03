@@ -134,7 +134,7 @@ def test_create_status(mock_client):
 
 
 @pytest.mark.parametrize(
-    "creation_timestamp, cooldown, expected",
+    "creation_timestamp, duration, expected",
     [
         (datetime.fromtimestamp(REFERENCE_TS), 300, False),
         (datetime.fromtimestamp(REFERENCE_TS - 300), 300, False),
@@ -142,14 +142,14 @@ def test_create_status(mock_client):
         (datetime.fromtimestamp(REFERENCE_TS + 100), 300, False,),  # 'future' configmaps should be no problem
     ],
 )
-def test_evaluate_status_cooldown_expired(freezer, creation_timestamp, cooldown, expected):
+def test_evaluate_status_duration_expired(freezer, creation_timestamp, duration, expected):
     freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.creation_timestamp = creation_timestamp
     config = get_config(["--namespace=test-ns"])
-    config.cooldown = cooldown
+    config.duration = duration
 
-    assert actions.evaluate_status_cooldown_expired(config, mock_cm) == expected
+    assert actions.evaluate_status_duration_expired(config, mock_cm) == expected
 
 
 def test_delete_status(mock_client):
