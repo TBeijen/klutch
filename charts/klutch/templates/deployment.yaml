@@ -34,6 +34,13 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+{{- if .Values.config.debug }}
+            - "--debug"
+{{- end }}
+            - "--interval={{ .Values.config.interval }}"
+            - "--duration={{ .Values.config.duration }}"
+            - "--trigger-max-age={{ .Values.config.triggerMaxAge }}"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
