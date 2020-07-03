@@ -23,17 +23,34 @@ def test_config_defaults():
 
 
 @pytest.mark.parametrize(
-    "args, exp_debug, exp_namespace",
+    "args, exp_debug, exp_namespace, exp_interval, exp_duration, exp_trigger_max_age",
     [
-        (["--debug", "--namespace=foo"], True, "foo"),
-        (["--namespace=foo"], False, "foo"),
-        (["--namespace=foo", "--debug"], True, "foo"),
+        (["--namespace=foo", "--interval=13", "--duration=17", "--trigger-max-age=19"], False, "foo", 13, 17, 19),
+        (
+            ["--namespace=foo", "--debug", "--interval=13", "--duration=17", "--trigger-max-age=19"],
+            True,
+            "foo",
+            13,
+            17,
+            19,
+        ),
+        (
+            ["--debug", "--interval=13", "--duration=17", "--trigger-max-age=19", "--namespace=foo"],
+            True,
+            "foo",
+            13,
+            17,
+            19,
+        ),
     ],
 )
-def test_config_args(args, exp_debug, exp_namespace):
+def test_config_args(args, exp_debug, exp_namespace, exp_interval, exp_duration, exp_trigger_max_age):
     config = get_config(args)
     assert config.debug == exp_debug
     assert config.namespace == exp_namespace
+    assert config.interval == exp_interval
+    assert config.duration == exp_duration
+    assert config.trigger_max_age == exp_trigger_max_age
 
 
 def test_config_unknown_arg(monkeypatch):

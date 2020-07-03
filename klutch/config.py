@@ -27,6 +27,12 @@ class Config:
 
     def __init__(self, args):
         self.debug = args.debug
+        if args.interval:
+            self.interval = int(args.interval)
+        if args.duration:
+            self.duration = int(args.duration)
+        if args.trigger_max_age:
+            self.trigger_max_age = int(args.trigger_max_age)
         if args.namespace:
             self.namespace = args.namespace
         else:
@@ -41,6 +47,17 @@ def _get_args(args):
     parser.add_argument(
         "--namespace",
         help="Namespace to look for triggers and store status in. By default will use the namespace klutch is deployed in. (Required when running out of cluster)",
+    )
+    parser.add_argument(
+        "--interval",
+        help="How frequent to scan for new triggers or ongoing scaling sequences. Default = 5 (seconds).",
+    )
+    parser.add_argument(
+        "--duration",
+        help="After this period, HorizontalPodAutoscalers will be restored to their original settings. Default= 300 (seconds).",
+    )
+    parser.add_argument(
+        "--trigger-max-age", help="Triggers older than this period will be ignored. Default= 300 (seconds).",
     )
     return parser.parse_args(args)
 
