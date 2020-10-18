@@ -1,0 +1,47 @@
+# Good reference for mkdocs.yml: https://github.com/squidfunk/mkdocs-material/blob/master/mkdocs.yml
+
+# Project information
+site_name: Klutch
+site_description: Docs for Klutch, a pre-scaler for Kubernetes
+
+# Repository
+repo_name: TBeijen/klutch
+repo_url: https://github.com/TBeijen/klutch
+edit_uri: ""
+
+# Theme configuration
+theme:
+  name: material
+  palette:
+    primary: 'blue'
+    accent: 'blue'
+  logo: ""
+  favicon: images/favicon-gear.ico
+  language: 'en'
+  feature:
+    tabs: false
+extra:
+  search:
+    language: 'en'
+
+# Plugins
+plugins:
+  - search
+
+# Markdown extensions
+markdown_extensions:
+  # Notes & highlights
+  # See: https://squidfunk.github.io/mkdocs-material/extensions/admonition/
+  - markdown.extensions.admonition
+  # Syntax highlighting
+  # See: https://squidfunk.github.io/mkdocs-material/extensions/codehilite/#codehilite
+  - markdown.extensions.codehilite:
+      guess_lang: false
+  - markdown.extensions.toc:
+      permalink: true
+extra_javascript:
+  # Mermaid graphs
+  - https://unpkg.com/mermaid@8.1.0/dist/mermaid.min.js
+
+nav:
+  - Home: index.md
