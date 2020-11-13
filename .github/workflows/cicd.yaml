@@ -57,9 +57,9 @@ jobs:
         with:
           fetch-depth: 1
 
-      # See: https://github.community/t/how-to-run-github-actions-workflow-only-for-new-tags/16075/20
       - name: Check if git tag exists
         run: echo "HEAD_TAG=$(git tag --points-at HEAD)" >> $GITHUB_ENV
+
       - name: Publish docker image
         uses: elgohr/Publish-Docker-Github-Action@master
         with:
@@ -69,3 +69,4 @@ jobs:
           tags: "latest,${{ env.HEAD_TAG }}"
           buildargs: "VERSION=${{ env.HEAD_TAG }}"
           no_push: ${{ env.HEAD_TAG == '' }}
+          cache: true

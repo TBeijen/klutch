@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  # See:
+  #  - https://github.com/python-poetry/poetry/blob/master/.github/workflows/release.yml
+  #  - https://github.com/orbit/orbit/blob/master/.github/workflows/release_orbit.yml
+  publishChart:
+    name: Publish Helm chart
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Get tag
+      id: tag
+      run: echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+    - name: Test tag
+      run: ./.github/scripts/set_version.sh
+
+      # echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
+
+    # - name: Publish Helm Chart to GitHub Repository
+    #   run: ./.github/scripts/helm_publish.sh
+    #   env:
+    #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    #     TAG_VERSION: ${{ steps.tag.outputs.tag }}
+
+    # - name: Commit and Create Release
+    #   run: ./.github/scripts/create_release.sh
+    #   env:
+    #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    #     TAG_VERSION: ${{ steps.tag.outputs.tag }}
+
+    # - name: Upload Helm Chart
+    #   run: ./.github/scripts/upload_chart.sh
+    #   env:
+    #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    #     TAG_VERSION: ${{ steps.tag.outputs.tag }}
