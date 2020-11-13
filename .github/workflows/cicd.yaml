@@ -5,6 +5,7 @@ on: [push, pull_request]
 jobs:
 
   test:
+    name: Run lintint and tests
     runs-on: ubuntu-latest
     steps:
 
@@ -51,7 +52,8 @@ jobs:
       - name: Linting and tests
         run: poetry run pre-commit run --all-files
 
-  publish:
+  build:
+    name: Build docker image
     runs-on: ubuntu-latest
     needs: test
     steps:
@@ -65,7 +67,6 @@ jobs:
         run: echo "::set-env name=HEAD_TAG::$(git tag --points-at HEAD)"
 
       - name: Publish docker image
-        if: env.HEAD_TAG != ''
         uses: elgohr/Publish-Docker-Github-Action@master
         with:
           name: tbeijen/klutch
@@ -73,3 +74,4 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           tags: "latest,${{ env.HEAD_TAG }}"
           buildargs: "VERSION=${{ env.HEAD_TAG }}"
+          no_push: ${{ env.HEAD_TAG == '' }}
