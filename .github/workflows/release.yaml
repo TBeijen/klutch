@@ -2,9 +2,10 @@ name: Release
 
 on:
   push:
-    tags:
-      - '*'
-
+    # tags:
+    #   - '*'
+    branches:
+      - update-poetry-action
 jobs:
   # See:
   #  - https://github.com/python-poetry/poetry/blob/master/.github/workflows/release.yml
