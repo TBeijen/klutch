@@ -19,8 +19,15 @@ jobs:
       id: tag
       run: echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-    - name: Test tag
+    - name: Update chart versions
       run: ./.github/scripts/set_version.sh
+
+    - name: Publish Helm charts
+      uses: stefanprodan/helm-gh-pages@1.2.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+
 
       # echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
 
