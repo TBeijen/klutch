@@ -23,7 +23,7 @@ jobs:
       run: ./.github/scripts/set_version.sh
 
     - name: Publish Helm charts
-      uses: stefanprodan/helm-gh-pages@1.2.0
+      uses: stefanprodan/helm-gh-pages@v1.2.0
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
