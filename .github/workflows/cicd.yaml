@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
 
   test:
-    name: Run lintint and tests
+    name: Run linting and tests
     runs-on: ubuntu-latest
     steps:
 
@@ -30,7 +30,7 @@ jobs:
           poetry config --list
 
       - name: Configure pre-commit
-        run: echo '::set-env name=PRE_COMMIT_HOME::.pre-commit-cache'
+        run: echo "PRE_COMMIT_HOME=.pre-commit-cache" >> $GITHUB_ENV
 
       - name: Set up Poetry cache
         uses: actions/cache@v1
@@ -64,8 +64,7 @@ jobs:
 
       # See: https://github.community/t/how-to-run-github-actions-workflow-only-for-new-tags/16075/20
       - name: Check if git tag exists
-        run: echo "::set-env name=HEAD_TAG::$(git tag --points-at HEAD)"
-
+        run: echo "HEAD_TAG=$(git tag --points-at HEAD)" >> $GITHUB_ENV
       - name: Publish docker image
         uses: elgohr/Publish-Docker-Github-Action@master
         with:
