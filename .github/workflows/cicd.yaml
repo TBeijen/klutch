@@ -57,16 +57,13 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Check if git tag exists
-        run: echo "HEAD_TAG=$(git tag --points-at HEAD)" >> $GITHUB_ENV
-
-      - name: Publish docker image
+      - name: Test build docker image
         uses: elgohr/Publish-Docker-Github-Action@master
         with:
           name: tbeijen/klutch
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          tags: "latest,${{ env.HEAD_TAG }}"
-          buildargs: "VERSION=${{ env.HEAD_TAG }}"
-          no_push: ${{ env.HEAD_TAG == '' }}
+          tags: "test"
+          buildargs: "VERSION=test"
+          no_push: true
           cache: true

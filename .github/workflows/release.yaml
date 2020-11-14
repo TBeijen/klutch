@@ -2,15 +2,11 @@ name: Release
 
 on:
   push:
-    # tags:
-    #   - '*'
-    branches:
-      - update-poetry-action
+    tags:
+      - '*'
+
 jobs:
-  # See:
-  #  - https://github.com/python-poetry/poetry/blob/master/.github/workflows/release.yml
-  #  - https://github.com/orbit/orbit/blob/master/.github/workflows/release_orbit.yml
-  publishChart:
+  publish:
     name: Publish Helm chart
     runs-on: ubuntu-latest
 
@@ -28,24 +24,12 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
-
-
-      # echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
-
-    # - name: Publish Helm Chart to GitHub Repository
-    #   run: ./.github/scripts/helm_publish.sh
-    #   env:
-    #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-    #     TAG_VERSION: ${{ steps.tag.outputs.tag }}
-
-    # - name: Commit and Create Release
-    #   run: ./.github/scripts/create_release.sh
-    #   env:
-    #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-    #     TAG_VERSION: ${{ steps.tag.outputs.tag }}
-
-    # - name: Upload Helm Chart
-    #   run: ./.github/scripts/upload_chart.sh
-    #   env:
-    #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-    #     TAG_VERSION: ${{ steps.tag.outputs.tag }}
+    - name: Build and publish docker image
+      uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        name: tbeijen/klutch
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        tags: "latest,${{ env.GIT_TAG }}"
+        buildargs: "VERSION=${{ env.GIT_TAG }}"
+        cache: true
