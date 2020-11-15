@@ -7,6 +7,9 @@ jobs:
   test:
     name: Run linting and tests
     runs-on: ubuntu-latest
+    # Prevent from runing twice on PRs in same repo. So either run from push (same repo) or PR (fork)
+    # See: https://github.community/t/duplicate-checks-on-push-and-pull-request-simultaneous-event/18012/6
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
 
       - uses: actions/checkout@v1
@@ -48,7 +51,8 @@ jobs:
         run: poetry run pre-commit run --all-files
 
   build:
-    name: Build docker image
+    # Note: Will be skipped together with test job if skipped by 'if' in test job.
+    name: Test build docker image
     runs-on: ubuntu-latest
     needs: test
     steps:
