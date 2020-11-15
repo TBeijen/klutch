@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish:
+    name: Publish Helm chart
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Get tag
+      id: tag
+      run: echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+    - name: Update chart versions
+      run: ./.github/scripts/set_version.sh
+
+    - name: Publish Helm charts
+      uses: stefanprodan/helm-gh-pages@v1.2.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and publish docker image
+      uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        name: tbeijen/klutch
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        tags: "latest,${{ env.GIT_TAG }}"
+        buildargs: "VERSION=${{ env.GIT_TAG }}"
+        cache: true

@@ -6,7 +6,7 @@ image:
   repository: tbeijen/klutch
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: 0.0.0
 
 imagePullSecrets: []
 nameOverride: ""
