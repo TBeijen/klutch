@@ -50,7 +50,7 @@ jobs:
       - name: Linting and tests
         run: poetry run pre-commit run --all-files
 
-  build:
+  docker:
     # Note: Will be skipped together with test job if skipped by 'if' in test job.
     name: Build docker image
     runs-on: ubuntu-latest
@@ -77,15 +77,3 @@ jobs:
           tags: tbeijen/klutch:test
           cache-from: type=registry,ref=tbeijen/klutch:latest
           cache-to: type=inline
-
-
-      # - name: Test build docker image
-      #   uses: elgohr/Publish-Docker-Github-Action@master
-      #   with:
-      #     name: tbeijen/klutch
-      #     username: ${{ secrets.DOCKER_USERNAME }}
-      #     password: ${{ secrets.DOCKER_PASSWORD }}
-      #     tags: "test"
-      #     buildargs: "VERSION=test"
-      #     no_push: true
-      #     cache: true
