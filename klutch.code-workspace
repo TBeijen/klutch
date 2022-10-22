@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../python_multi_thread_poc"
+		}
+	],
+	"settings": {}
+}
