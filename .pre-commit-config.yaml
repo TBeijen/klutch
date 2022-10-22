@@ -54,7 +54,13 @@ repos:
         entry: poetry run safety
         language: system
         pass_filenames: false
-        args: ["check", "--bare"]
+        args:
+          - "check"
+          - "--bare"
+          # https://pyup.io/vulnerabilities/CVE-2021-29923/45114/
+          # Latest kubernetes package. Seems to be in server golang code, not python SDK??/
+          - "-i"
+          - "45114"
         # stages: [push]
 
       - id: pytest
