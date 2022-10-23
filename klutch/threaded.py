@@ -4,7 +4,7 @@ import sys
 import time
 from queue import Queue
 
-from klutch.config import get_config
+from klutch.old_config import get_config
 from klutch.threads import TriggerConfigMap
 from klutch.threads import TriggerWebHook
 
@@ -117,6 +117,7 @@ def main(args=None):
     threads.add(web_thread)
     threads.start_all()
 
+    print("all is joined")
     # def handle_exit(signalnum, frame):
     #     # terminate
     #     print('Main interrupted! Exiting.')

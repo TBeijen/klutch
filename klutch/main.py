@@ -1,9 +1,9 @@
 import logging
 import time
 
-from klutch.config import configure_kubernetes
-from klutch.config import get_config
 from klutch.exit_handler import ExitHandler
+from klutch.old_config import configure_kubernetes
+from klutch.old_config import get_config
 from klutch.process import process_ongoing
 from klutch.process import process_orphans
 from klutch.process import process_triggers

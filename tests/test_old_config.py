@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from klutch.config import configure_kubernetes
-from klutch.config import get_config
+from klutch.old_config import configure_kubernetes
+from klutch.old_config import get_config
 
 
 def test_config_defaults():
@@ -62,7 +62,8 @@ def test_config_unknown_arg(monkeypatch):
 
 def test_config_in_cluster_uses_namespace(fs):
     fs.create_file(
-        "/var/run/secrets/kubernetes.io/serviceaccount/namespace", contents="cluster-namespace",
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+        contents="cluster-namespace",
     )
     config = get_config([])
     assert config.namespace == "cluster-namespace"
@@ -70,7 +71,8 @@ def test_config_in_cluster_uses_namespace(fs):
 
 def test_config_in_cluster_override_namespace(fs):
     fs.create_file(
-        "/var/run/secrets/kubernetes.io/serviceaccount/namespace", contents="cluster-namespace",
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+        contents="cluster-namespace",
     )
     config = get_config(["--namespace=override-namespace"])
     assert config.namespace == "override-namespace"

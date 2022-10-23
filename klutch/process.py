@@ -2,7 +2,7 @@ import json
 import logging
 
 from klutch import actions
-from klutch.config import Config
+from klutch.old_config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +35,17 @@ def process_triggers(config: Config):
         actions.delete_trigger(trigger_cm)
         logger.warning(
             "Trigger ConfigMap (name={}, uid={}) is not valid (expired) and has been deleted.".format(
-                trigger_cm.metadata.name, trigger_cm.metadata.uid,
+                trigger_cm.metadata.name,
+                trigger_cm.metadata.uid,
             )
         )
         return False
 
     logger.info(
-        "Processing trigger ConfigMap (name={}, uid={})".format(trigger_cm.metadata.name, trigger_cm.metadata.uid,)
+        "Processing trigger ConfigMap (name={}, uid={})".format(
+            trigger_cm.metadata.name,
+            trigger_cm.metadata.uid,
+        )
     )
     status = []
     for hpa in actions.find_hpas(config):
@@ -58,7 +62,10 @@ def process_triggers(config: Config):
             # Allow other hpas to be processed on any (un)expected error
             logger.error(
                 "Error while scaling up HorizontalPodAutoscaler (namespace={ns}, name={name}, uid={uid}). Reason: {err}".format(
-                    ns=hpa.metadata.namespace, name=hpa.metadata.name, uid=hpa.metadata.uid, err=str(e),
+                    ns=hpa.metadata.namespace,
+                    name=hpa.metadata.name,
+                    uid=hpa.metadata.uid,
+                    err=str(e),
                 )
             )
     created_status_cm = actions.create_status(config, status)
@@ -110,7 +117,9 @@ def process_ongoing(config: Config):
             except Exception as e:
                 logger.error(
                     "Error while reconciling HorizontalPodAutoscaler (namespace={ns}, name={name}). Reason: {err}".format(
-                        ns=namespace, name=name, err=str(e),
+                        ns=namespace,
+                        name=name,
+                        err=str(e),
                     )
                 )
         return True
@@ -124,7 +133,9 @@ def process_ongoing(config: Config):
             except Exception as e:
                 logger.error(
                     "Error while reverting HorizontalPodAutoscaler (namespace={ns}, name={name}). Reason: {err}".format(
-                        ns=namespace, name=name, err=str(e),
+                        ns=namespace,
+                        name=name,
+                        err=str(e),
                     )
                 )
         actions.delete_status(status_cm)

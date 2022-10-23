@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 
-from kubernetes import config
+from kubernetes import config  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,9 @@ class Config:
 def _get_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--debug", help="Debug mode", action="store_true",
+        "--debug",
+        help="Debug mode",
+        action="store_true",
     )
     parser.add_argument(
         "--namespace",
@@ -57,7 +59,8 @@ def _get_args(args):
         help="After this period, HorizontalPodAutoscalers will be restored to their original settings. Default= 300 (seconds).",
     )
     parser.add_argument(
-        "--trigger-max-age", help="Triggers older than this period will be ignored. Default= 300 (seconds).",
+        "--trigger-max-age",
+        help="Triggers older than this period will be ignored. Default= 300 (seconds).",
     )
     return parser.parse_args(args)
 

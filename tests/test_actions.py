@@ -7,7 +7,7 @@ import pytest
 from kubernetes import client
 
 from klutch import actions
-from klutch.config import get_config
+from klutch.old_config import get_config
 
 REFERENCE_TS = 1500000000
 
@@ -61,7 +61,11 @@ def test_find_triggers(mock_client):
         (datetime.fromtimestamp(REFERENCE_TS), 100, True),
         (datetime.fromtimestamp(REFERENCE_TS - 100), 100, True),
         (datetime.fromtimestamp(REFERENCE_TS - 200), 100, False),
-        (datetime.fromtimestamp(REFERENCE_TS + 100), 100, True,),  # 'future' configmaps should be no problem
+        (
+            datetime.fromtimestamp(REFERENCE_TS + 100),
+            100,
+            True,
+        ),  # 'future' configmaps should be no problem
     ],
 )
 def test_validate_trigger(freezer, creation_timestamp, trigger_max_age, expected):
@@ -139,7 +143,11 @@ def test_create_status(mock_client):
         (datetime.fromtimestamp(REFERENCE_TS), 300, False),
         (datetime.fromtimestamp(REFERENCE_TS - 300), 300, False),
         (datetime.fromtimestamp(REFERENCE_TS - 301), 300, True),
-        (datetime.fromtimestamp(REFERENCE_TS + 100), 300, False,),  # 'future' configmaps should be no problem
+        (
+            datetime.fromtimestamp(REFERENCE_TS + 100),
+            300,
+            False,
+        ),  # 'future' configmaps should be no problem
     ],
 )
 def test_evaluate_status_duration_expired(freezer, creation_timestamp, duration, expected):
