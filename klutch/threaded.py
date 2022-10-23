@@ -5,7 +5,8 @@ import time
 from queue import Queue
 
 from klutch.config import get_config
-from klutch.threads.trigger_configmap import TriggerConfigMap
+from klutch.threads import TriggerConfigMap
+from klutch.threads import TriggerWebHook
 
 
 # logging.basicConfig(
@@ -111,7 +112,9 @@ def main(args=None):
     threads = ThreadHandler()
     threads.add(TriggerConfigMap(trigger_queue, config, "1"))
     threads.add(TriggerConfigMap(trigger_queue, config, "2"))
-    threads.add(TriggerConfigMap(trigger_queue, config, "3"))
+    web_thread = TriggerWebHook(trigger_queue, config, "3")
+    # web_thread.setDaemon(True)
+    threads.add(web_thread)
     threads.start_all()
 
     # def handle_exit(signalnum, frame):
