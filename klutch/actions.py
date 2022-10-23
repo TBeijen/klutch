@@ -7,12 +7,12 @@ from typing import List
 
 from kubernetes import client  # type: ignore
 
-from klutch.old_config import Config
+from klutch.config import KlutchConfig
 
 logger = logging.getLogger(__name__)
 
 
-def find_triggers(config: Config) -> List[client.models.v1_config_map.V1ConfigMap]:
+def find_triggers(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
     """Find any configmap labeled as trigger and return it. Recent first."""
     resp = client.CoreV1Api().list_namespaced_config_map(
         config.namespace,
@@ -28,7 +28,7 @@ def find_triggers(config: Config) -> List[client.models.v1_config_map.V1ConfigMa
     )
 
 
-def validate_trigger(config: Config, trigger: client.models.v1_config_map.V1ConfigMap) -> bool:
+def validate_trigger(config: KlutchConfig, trigger: client.models.v1_config_map.V1ConfigMap) -> bool:
     """Evaluate trigger ConfigMap age, returning True if valid."""
     cm_ts = trigger.metadata.creation_timestamp.timestamp()
     now = datetime.now().timestamp()
@@ -39,7 +39,7 @@ def delete_trigger(trigger: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(trigger.metadata.name, trigger.metadata.namespace)
 
 
-def find_status(config: Config) -> List[client.models.v1_config_map.V1ConfigMap]:
+def find_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
     """Find any configmap labeled as status and return it. Recent first."""
     resp = client.CoreV1Api().list_namespaced_config_map(
         config.namespace,
@@ -77,7 +77,7 @@ def delete_status(status: client.models.v1_config_map.V1ConfigMap):
 
 
 def find_hpas(
-    config: Config,
+    config: KlutchConfig,
 ) -> Iterable[client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler]:
     """Find any HorizontalPodAutoscaler having klutch annotation."""
     resp = client.AutoscalingV1Api().list_horizontal_pod_autoscaler_for_all_namespaces()
@@ -85,7 +85,7 @@ def find_hpas(
 
 
 def scale_hpa(
-    config: Config,
+    config: KlutchConfig,
     hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler,
 ) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
     """Scale up hpa. Write status in annotation. Return patched hpa."""
@@ -130,7 +130,7 @@ def scale_hpa(
 
 
 def reconcile_hpa(
-    config: Config, name: str, namespace: str, klutch_hpa_status
+    config: KlutchConfig, name: str, namespace: str, klutch_hpa_status
 ) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
     """Examine hpa and ensure minReplicas has overdrive value and annotation is set."""
     # load hpa first to determine if annotation hasn't been removed (will make patch fail)
@@ -158,7 +158,7 @@ def reconcile_hpa(
 
 
 def revert_hpa(
-    config: Config, name: str, namespace: str, klutch_hpa_status
+    config: KlutchConfig, name: str, namespace: str, klutch_hpa_status
 ) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
     """Restore minReplicas to original value and remove status annotation."""
     # load hpa first to determine if annotation hasn't been removed (will make patch fail)

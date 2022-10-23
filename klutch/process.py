@@ -2,7 +2,7 @@ import json
 import logging
 
 from klutch import actions
-from klutch.old_config import Config
+from klutch.config import Config
 
 logger = logging.getLogger(__name__)
 

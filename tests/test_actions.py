@@ -7,7 +7,7 @@ import pytest
 from kubernetes import client
 
 from klutch import actions
-from klutch.old_config import get_config
+from klutch.config import config
 
 REFERENCE_TS = 1500000000
 
@@ -39,7 +39,7 @@ def test_find_triggers(mock_client):
     mock_cm_old.metadata.name = "old"
     mock_cm_old.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS - 100)
 
-    config = get_config(["--namespace=test-ns"])
+    # config = get_config(["--namespace=test-ns"])
     config.cm_trigger_label_key = "test-trigger"
     config.cm_trigger_label_value = "yes"
 
