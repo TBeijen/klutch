@@ -119,7 +119,7 @@ def main():
 
     trigger_queue = Queue()
     threads = ThreadHandler()
-    if config.trigger_webhook.enabled:
+    if config.trigger_web_hook.enabled:
         threads.add(TriggerWebHook(trigger_queue, config))
     if config.trigger_config_map.enabled:
         threads.add(TriggerConfigMap(trigger_queue, config))

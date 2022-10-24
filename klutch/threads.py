@@ -4,96 +4,94 @@ import threading
 import time
 
 
-class TriggerConfigMap(threading.Thread):
-    logger = None
+class BaseThread(threading.Thread):
 
-    def __init__(self, queue, config, name_suffix=""):
-        super().__init__()
-        name = self.__class__.__name__ + name_suffix
+    tick_interval = 1
+
+    def __init__(self, queue, config, name_suffix="", *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.should_stop = False
-        self.name = name
         self.queue = queue
         self.config = config
-        self.logger = logging.getLogger(name)
-        self.logger.info(f"Started {name}")
+        self.logger = logging.getLogger(self.__class__.__name__ + name_suffix)
+        self.logger.info(f"Started")
 
+    def run(self):
+        try:
+            while True:
+                if self.should_stop:
+                    self.logger.info("Stopping")
+                    return
+                self.logger.debug("Running")
+                time.sleep(self.tick_interval)
+        finally:
+            self.logger.info("Stopped")
+
+    def stop(self):
+        self.logger.info("Received stop")
+        self.should_stop = True
+
+    def trigger(self):
+        self.logger.info("Triggering")
+        self.queue.put(self.__class__.__name__)
+
+
+class TriggerConfigMap(BaseThread):
     def run(self):
         try:
             while True:
                 if self.should_stop:
                     self.logger.info("stopping")
                     return
-                self.logger.info("running")
-                time.sleep(1)
+                self.logger.debug("running")
+                time.sleep(self.tick_interval)
         finally:
-            self.logger.info("ended")
-
-    def stop(self):
-        self.logger.info("Received stop()")
-        self.should_stop = True
+            self.logger.info("stopped")
 
 
-class TriggerWebHook(threading.Thread):
-    logger = None
-
-    def __init__(self, queue, config, name_suffix=""):
-        super().__init__()
-        name = self.__class__.__name__ + name_suffix
-
-        self.server_thread = None
-        self.should_stop = False
-        self.name = name
-        self.queue = queue
-        self.config = config
-        self.logger = logging.getLogger(name)
-        self.logger.info(f"Started {name}")
-
+class TriggerWebHook(BaseThread):
     def run(self):
+        _queue = self.queue
+        _logger = self.logger
+        _trigger = self.trigger
 
-        # handler = http.server.BaseHTTPRequestHandler()
+        class Handler(http.server.BaseHTTPRequestHandler):
+            queue = _queue
+            logger = _logger
+            trigger = _trigger
 
-        server_address = ("", 8123)
-        httpd = http.server.ThreadingHTTPServer(server_address, http.server.BaseHTTPRequestHandler)
+            error_message_format: str = "%(code)d: %(message)s"
+
+            def do_POST(self):
+                self.trigger()
+
+                body = "OK"
+                self.send_response(200)
+                self.send_header("Content-type", "text/plain")
+                self.end_headers()
+                self.wfile.write(body.encode("utf-8"))
+
+            def log_message(self, format, *args):
+                self.logger.info(format % args)
+
+        server_address = (self.config.trigger_web_hook.address, self.config.trigger_web_hook.port)
+        httpd = http.server.ThreadingHTTPServer(server_address, Handler)
 
         def start_threaded(httpd):
             httpd.serve_forever()
 
-        # while True:
-        self.logger.info(f"starting webserver on port {server_address}")
+        self.logger.info(f"Starting webserver at {server_address}")
         thread = threading.Thread(target=start_threaded, args=(httpd,))
         thread.start()
-        # httpd.serve_forever()
-        # httpd.handle_request()
 
         try:
             while True:
                 if self.should_stop:
-                    self.logger.info("stopping")
+                    self.logger.info("Stopping")
                     httpd.shutdown()
                     return
-                self.logger.info("running")
-                time.sleep(1)
+                self.logger.debug("Running")
+                time.sleep(self.tick_interval)
         finally:
-            self.logger.info("ended")
-
-    def stop(self):
-        self.logger.info("Received stop()")
-        self.should_stop = True
-
-
-# import CGIHTTPServer
-# import BaseHTTPServer
-
-# KEEP_RUNNING = True
-
-# def keep_running():
-#     return KEEP_RUNNING
-
-# class Handler(CGIHTTPServer.CGIHTTPRequestHandler):
-#     cgi_directories = ["/cgi-bin"]
-
-# httpd = BaseHTTPServer.HTTPServer(("", 8000), Handler)
-
-# while keep_running():
-#     httpd.handle_request()
+            self.logger.info("Stopped")

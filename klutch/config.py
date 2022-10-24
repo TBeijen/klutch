@@ -57,7 +57,7 @@ class TriggerConfigMapSection(ConfigSection):
 
 class KlutchConfig(Config):
     common: CommonSection
-    trigger_webhook: TriggerWebHookSection
+    trigger_web_hook: TriggerWebHookSection
     trigger_config_map: TriggerConfigMapSection
 
 
