@@ -3,6 +3,8 @@ import logging
 import threading
 import time
 
+from klutch import actions
+
 
 class BaseThread(threading.Thread):
 
@@ -38,13 +40,41 @@ class BaseThread(threading.Thread):
 
 
 class TriggerConfigMap(BaseThread):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tick_interval = self.config.trigger_config_map.scan_interval
+
     def run(self):
         try:
             while True:
                 if self.should_stop:
-                    self.logger.info("stopping")
+                    self.logger.info("Stopping")
                     return
-                self.logger.debug("running")
+
+                self.logger.debug("Looking for trigger ConfigMap objects.")
+                trigger_cm_list = actions.find_triggers(self.config)
+
+                if trigger_cm_list:
+                    trigger_cm = trigger_cm_list.pop(0)
+                    # validate
+                    if actions.validate_trigger(self.config, trigger_cm):
+                        self.trigger()
+                    else:
+                        self.logger.warning(
+                            "Trigger ConfigMap (name={}, uid={}) is not valid (expired) and has been deleted.".format(
+                                trigger_cm.metadata.name,
+                                trigger_cm.metadata.uid,
+                            )
+                        )
+                    # cleanup
+                    actions.delete_trigger(trigger_cm)
+                    if trigger_cm_list:
+                        self.logger.warning("More than one trigger found. Using most recent. Removing others.")
+                        for t in trigger_cm_list:
+                            actions.delete_trigger(t)
+                else:
+                    self.logger.debug("No triggers found")
+
                 time.sleep(self.tick_interval)
         finally:
             self.logger.info("stopped")

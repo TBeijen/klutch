@@ -20,6 +20,13 @@ def mock_client(monkeypatch):
     return mock_client
 
 
+@pytest.fixture
+def mock_config():
+    mock_config = Mock(config)
+    mock_config.common.namespace = "test-ns"
+    return mock_config
+
+
 def get_mock_hpa(name="test-hpa", namespace="test-ns", min_repl=2, max_repl=10, current_repl=4, annotations=None):
     mock_hpa = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
     mock_hpa.metadata.name = name
@@ -32,7 +39,7 @@ def get_mock_hpa(name="test-hpa", namespace="test-ns", min_repl=2, max_repl=10, 
     return mock_hpa
 
 
-def test_find_triggers(mock_client):
+def test_find_triggers(mock_client, mock_config):
     mock_cm_new = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm_new.metadata.name = "new"
     mock_cm_new.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS)
@@ -40,14 +47,12 @@ def test_find_triggers(mock_client):
     mock_cm_old.metadata.name = "old"
     mock_cm_old.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS - 100)
 
-    mock_config = Mock(config)
-    mock_config.common.namespace = "test-ns"
     mock_config.trigger_config_map.cm_trigger_label_key = "test-trigger"
     mock_config.trigger_config_map.cm_trigger_label_value = "yes"
 
-    mock_config_list = MagicMock()
-    mock_config_list.items = [mock_cm_old, mock_cm_new]
-    mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_config_list
+    mock_cm_list = MagicMock()
+    mock_cm_list.items = [mock_cm_old, mock_cm_new]
+    mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_cm_list
 
     found = actions.find_triggers(mock_config)
 
@@ -70,14 +75,14 @@ def test_find_triggers(mock_client):
         ),  # 'future' configmaps should be no problem
     ],
 )
-def test_validate_trigger(freezer, creation_timestamp, trigger_max_age, expected):
+def test_validate_trigger(freezer, creation_timestamp, trigger_max_age, expected, mock_config):
     freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.creation_timestamp = creation_timestamp
-    config = get_config(["--namespace=test-ns"])
-    config.trigger_max_age = trigger_max_age
 
-    assert actions.validate_trigger(config, mock_cm) == expected
+    mock_config.trigger_config_map.max_age = trigger_max_age
+
+    assert actions.validate_trigger(mock_config, mock_cm) == expected
 
 
 def test_delete_trigger(mock_client):

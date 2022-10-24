@@ -32,7 +32,7 @@ def validate_trigger(config: KlutchConfig, trigger: client.models.v1_config_map.
     """Evaluate trigger ConfigMap age, returning True if valid."""
     cm_ts = trigger.metadata.creation_timestamp.timestamp()
     now = datetime.now().timestamp()
-    return cm_ts + config.trigger_max_age >= now
+    return cm_ts + config.trigger_config_map.max_age >= now
 
 
 def delete_trigger(trigger: client.models.v1_config_map.V1ConfigMap):

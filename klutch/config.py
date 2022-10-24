@@ -76,6 +76,8 @@ class TriggerConfigMapSection(ConfigSection):
     enabled: bool = True
     # Interval (seconds) used to scan for trigger configmap
     scan_interval: int = 10
+    # Max age (seconds) of configmap trigger before it's ignored and cleaned up
+    max_age: int = 240
     # Should not typically need changing: Name and label of configmap that can be added as trigger
     cm_trigger_label_key: str = "klutch.it/trigger"
     cm_trigger_label_value: str = "1"
