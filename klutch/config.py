@@ -11,7 +11,23 @@ from nx_config import validate  # type: ignore
 logger = logging.getLogger(__name__)
 
 
-class CommonSection(ConfigSection):
+class CommonSectionMixin:
+
+    """
+    nx_config is quite restrictive in what attributes it allows to be set (None).
+
+    This mixin provides an attribute, not part of config, that can be used to store found in-cluster namespace.
+    """
+
+    _in_cluster_namespace: str = ""
+    klutch_namespace: str = ""
+
+    @property
+    def namespace(self) -> str:
+        return self.klutch_namespace or self._in_cluster_namespace
+
+
+class CommonSection(CommonSectionMixin, ConfigSection):
     debug: bool = False
     # Period (seconds) after which to restore original values
     duration: int = 300
@@ -38,6 +54,16 @@ class CommonSection(ConfigSection):
     def validate_reconcile_interval(self):
         if self.reconcile_interval > self.duration:
             raise ValueError("reconconcile_interval cannot be larger than duration")
+        print(self._in_cluster_namespace)
+
+    @validate
+    def validate_klutch_namespace(self):
+        try:
+            self._in_cluster_namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
+        except FileNotFoundError:
+            self._in_cluster_namespace = None
+        if not self._in_cluster_namespace and not self.klutch_namespace:
+            raise ValueError("When running out of cluster, klutch_namespace needs to be set")
 
 
 class TriggerWebHookSection(ConfigSection):

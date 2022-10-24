@@ -2,6 +2,7 @@ import json
 from contextlib import ExitStack as does_not_raise
 from datetime import datetime
 from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 import pytest
 from kubernetes import client
@@ -39,15 +40,16 @@ def test_find_triggers(mock_client):
     mock_cm_old.metadata.name = "old"
     mock_cm_old.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS - 100)
 
-    # config = get_config(["--namespace=test-ns"])
-    config.cm_trigger_label_key = "test-trigger"
-    config.cm_trigger_label_value = "yes"
+    mock_config = Mock(config)
+    mock_config.common.namespace = "test-ns"
+    mock_config.trigger_config_map.cm_trigger_label_key = "test-trigger"
+    mock_config.trigger_config_map.cm_trigger_label_value = "yes"
 
     mock_config_list = MagicMock()
     mock_config_list.items = [mock_cm_old, mock_cm_new]
     mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_config_list
 
-    found = actions.find_triggers(config)
+    found = actions.find_triggers(mock_config)
 
     assert found == [mock_cm_new, mock_cm_old]  # sorted recent first
     mock_client.CoreV1Api().list_namespaced_config_map.assert_called_once_with(
