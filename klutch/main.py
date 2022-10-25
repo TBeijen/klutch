@@ -1,6 +1,7 @@
 import logging
 import signal
 import sys
+import threading
 import time
 from argparse import ArgumentParser
 from queue import Queue
@@ -18,17 +19,12 @@ from klutch.threads import TriggerWebHook
 class ThreadHandler:
 
     """
-    ExitHandler ensures main loop finishes before exiting.
+    ThreadHandler.
 
-    Class for:
-    * Intercepting SIGINT/SIGTERM, preventing exit during main loop execution phase.
-    * Providing context handler allowing exit during main loop pause phase.
-
-    See: https://stackoverflow.com/questions/18499497/how-to-process-sigterm-signal-gracefully (sample implementations)
+    - Starts multiple threads
+    - Traps SIGINT/SIGTERM and gracefully stops threads before ending program
+    - Registers exception_hook to attempt graceful shutdown when unhandled exception is raised in thread
     """
-
-    # should_exit = False
-    # safe_to_exit = False
 
     def __init__(self):
         self.threads = []
@@ -36,6 +32,7 @@ class ThreadHandler:
         self.logger = logging.getLogger(self.__class__.__name__)
         signal.signal(signal.SIGINT, self.handle_signal)
         signal.signal(signal.SIGTERM, self.handle_signal)
+        self._setup_excepthook()
 
     def add(self, thread):
         self.threads.append(thread)
@@ -52,6 +49,15 @@ class ThreadHandler:
                 sig_name=signal.Signals(signum).name, signum=signum
             )
         )
+        self._stop_program()
+
+    def _stop_program(self):
+        """
+        Will stop all threads gracefully.
+
+        If one of threads raised an exception caught by excepthook, this thread will
+        not join, remain alive and program will exit with exit code 1.
+        """
         for t in self.threads:
             t.stop()
         while True:
@@ -59,48 +65,25 @@ class ThreadHandler:
                 self.logger.info("All threads stopped. Exiting.")
                 sys.exit(0)
             if self.timeout > 0:
-                self.logger.info("Waiting for threads to stop.")
+                self.logger.debug("Waiting for threads to stop.")
                 self.timeout -= 1
                 time.sleep(1)
             else:
                 self.logger.error("Threads failed to stop within timeout. Aborting.")
                 sys.exit(1)
 
-        # self.should_exit = True
-        # self.exit_if_needed()
+    def _setup_excepthook(self):
+        _self = self
 
-    # def exit_if_needed(self):
-    #     """Do actual exit, only if needed and safe to do now."""
-    #     if self.should_exit and self.safe_to_exit:
-    #         logger.info("Safe to exit. Exiting....")
-    #         sys.exit(0)
+        def hook(args: threading.ExceptHookArgs):
+            print(args)
+            _self._stop_program()
 
-    # @contextlib.contextmanager
-    # def safe_exit(self):
-    #     """
-    #     Context manager for code executionduring which program can safely exit.
-
-    #     Wraps sleep of main loop.
-    #     If having caught term. signal during main loop, exit immediately when entering context.
-
-    #     See: https://docs.python.org/3/library/contextlib.html
-    #     """
-    #     self.safe_to_exit = True
-    #     self.exit_if_needed()
-    #     yield
-    #     self.safe_to_exit = False
-
-
-# parser = ArgumentParser()
-# parser.add_argument("--name")
-# add_cli_options(parser, config_t=type(config))
-# args = parser.parse_args()
-
-# fill_config_from_path(config, path=resolve_config_path(cli_args=args))
+        threading.excepthook = hook
 
 
 def main():
-    """Set up logger and trigger control loop."""
+    """Set up logger, configure application and start threads."""
     parser = ArgumentParser()
     add_cli_options(parser, config_t=type(config))
     args = parser.parse_args()

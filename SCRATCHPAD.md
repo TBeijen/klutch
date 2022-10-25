@@ -30,6 +30,7 @@ Threads
 * https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
 * https://blog.miguelgrinberg.com/post/how-to-kill-a-python-thread
 
+* Testing excepthook: https://github.com/pytest-dev/pytest/discussions/9193#discussioncomment-1463715
 
 Old
 

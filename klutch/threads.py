@@ -13,10 +13,11 @@ class BaseThread(threading.Thread):
     def __init__(self, queue, config, name_suffix="", *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.full_name = "{cls} ({thr})".format(cls=self.__class__.__name__, thr=self.name)
         self.should_stop = False
         self.queue = queue
         self.config = config
-        self.logger = logging.getLogger(self.__class__.__name__ + name_suffix)
+        self.logger = logging.getLogger(self.full_name)
         self.logger.info(f"Started")
 
     def run(self):
@@ -36,7 +37,7 @@ class BaseThread(threading.Thread):
 
     def trigger(self):
         self.logger.info("Triggering")
-        self.queue.put(self.__class__.__name__)
+        self.queue.put(self.full_name)
 
 
 class TriggerConfigMap(BaseThread):
@@ -77,7 +78,7 @@ class TriggerConfigMap(BaseThread):
 
                 time.sleep(self.tick_interval)
         finally:
-            self.logger.info("stopped")
+            self.logger.info("Stopped")
 
 
 class TriggerWebHook(BaseThread):

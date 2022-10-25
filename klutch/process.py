@@ -41,6 +41,8 @@ def process_triggers(config: Config):
         )
         return False
 
+    # ==== Above is re-implemented
+
     logger.info(
         "Processing trigger ConfigMap (name={}, uid={})".format(
             trigger_cm.metadata.name,
