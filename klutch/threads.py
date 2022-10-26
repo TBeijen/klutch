@@ -2,6 +2,8 @@ import http.server
 import logging
 import threading
 import time
+from queue import Empty
+from queue import Queue
 
 from klutch import actions
 
@@ -10,7 +12,7 @@ class BaseThread(threading.Thread):
 
     tick_interval = 1
 
-    def __init__(self, queue, config, name_suffix="", *args, **kwargs):
+    def __init__(self, queue: Queue, config, name_suffix="", *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.full_name = "{cls} ({thr})".format(cls=self.__class__.__name__, thr=self.name)
@@ -38,6 +40,44 @@ class BaseThread(threading.Thread):
     def trigger(self):
         self.logger.info("Triggering")
         self.queue.put(self.full_name)
+
+
+class ProcessScaler(BaseThread):
+
+    """
+    Main process.
+
+    Responds to trigger, scales up. Scales down after certain duration,
+    On startup will scan for status configmap which indicates klutch restart (e.g. re-scheduled)
+    while in midst of scale-up/down cycle.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.queue_wait = 5
+        self.is_active = False
+        self.scale_duration = self.config.common.duration
+        self.reconcile_interval = self.config.common.reconcile_interval
+
+    def run(self):
+        # TODO init, check status
+
+        try:
+            while True:
+                if self.is_active:
+                    time.sleep(self.queue_wait)
+                else:
+                    try:
+                        payload = self.queue.get(block=True, timeout=self.queue_wait)
+                        self.logger.info(f"Received trigger {payload}")
+                    except Empty:
+                        self.logger.debug("No trigger fired, starting next cycle.")
+
+                if self.should_stop:
+                    self.logger.info("Stopping")
+                    return
+        finally:
+            self.logger.info("Stopped")
 
 
 class TriggerConfigMap(BaseThread):

@@ -12,6 +12,7 @@ from nx_config import resolve_config_path  # type: ignore
 
 from klutch.config import config
 from klutch.config import configure_kubernetes
+from klutch.threads import ProcessScaler
 from klutch.threads import TriggerConfigMap
 from klutch.threads import TriggerWebHook
 
@@ -102,6 +103,7 @@ def main():
 
     trigger_queue = Queue()
     threads = ThreadHandler()
+    threads.add(ProcessScaler(trigger_queue, config))
     if config.trigger_web_hook.enabled:
         threads.add(TriggerWebHook(trigger_queue, config))
     if config.trigger_config_map.enabled:
