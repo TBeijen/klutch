@@ -54,18 +54,16 @@ def find_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1Conf
         reverse=True,
     )
 
-    # ==== Above is re-implemented
 
-
-def create_status(config, status: list):
+def create_status(config: KlutchConfig, status: list):
     config_map = client.models.v1_config_map.V1ConfigMap(
         data={"status": json.dumps(status)},
         metadata=client.models.V1ObjectMeta(
-            name=config.cm_status_name,
-            labels={config.cm_status_label_key: config.cm_status_label_value},
+            name=config.common.cm_status_name,
+            labels={config.common.cm_status_label_key: config.common.cm_status_label_value},
         ),
     )
-    return client.CoreV1Api().create_namespaced_config_map(config.namespace, config_map)
+    return client.CoreV1Api().create_namespaced_config_map(config.common.namespace, config_map)
 
 
 def is_status_duration_expired(config: KlutchConfig, status: client.models.v1_config_map.V1ConfigMap) -> bool:
@@ -77,6 +75,9 @@ def is_status_duration_expired(config: KlutchConfig, status: client.models.v1_co
 
 def delete_status(status: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(status.metadata.name, status.metadata.namespace)
+
+
+# ==== Above is re-implemented
 
 
 def find_hpas(

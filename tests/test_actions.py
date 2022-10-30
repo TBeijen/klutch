@@ -95,9 +95,6 @@ def test_delete_cm_trigger(mock_client):
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
-# ==== Above is re-implemented
-
-# OK
 def test_find_status(mock_client, mock_config):
     mock_cm_new = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm_new.metadata.name = "new"
@@ -121,11 +118,10 @@ def test_find_status(mock_client, mock_config):
     )
 
 
-def test_create_status(mock_client):
-    config = get_config(["--namespace=test-ns"])
-    config.cm_status_name = "kl-status-name"
-    config.cm_status_label_key = "kl-status"
-    config.cm_status_label_value = "yes"
+def test_create_status(mock_client, mock_config):
+    mock_config.common.cm_status_name = "kl-status-name"
+    mock_config.common.cm_status_label_key = "kl-status"
+    mock_config.common.cm_status_label_value = "yes"
 
     status = [{"foo": "bar"}]
     mock_response = MagicMock()
@@ -134,7 +130,7 @@ def test_create_status(mock_client):
     # Prevent models instantiated in sut to be mocks as well
     mock_client.models = client.models
 
-    resp = actions.create_status(config, status)
+    resp = actions.create_status(mock_config, status)
 
     call_args = mock_client.CoreV1Api().create_namespaced_config_map.call_args_list
     assert len(call_args) == 1
@@ -146,7 +142,6 @@ def test_create_status(mock_client):
     assert resp is mock_response
 
 
-# OK
 @pytest.mark.parametrize(
     "creation_timestamp, duration, expected",
     [
@@ -169,9 +164,6 @@ def test_is_status_duration_expired(freezer, creation_timestamp, duration, expec
     assert actions.is_status_duration_expired(mock_config, mock_cm) == expected
 
 
-# OK
-
-
 def test_delete_status(mock_client):
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.name = "foo-name"
@@ -180,6 +172,9 @@ def test_delete_status(mock_client):
     actions.delete_status(mock_cm)
 
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
+
+
+# ==== Above is re-implemented
 
 
 def test_find_hpas(mock_client):
