@@ -52,6 +52,8 @@ class ProcessScaler(BaseThread):
     while in midst of scale-up/down cycle.
     """
 
+    status = None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.queue_wait = 5
@@ -60,16 +62,20 @@ class ProcessScaler(BaseThread):
         self.reconcile_interval = self.config.common.reconcile_interval
 
     def run(self):
-        # TODO init, check status
-
+        self._start_up()
         try:
             while True:
-                if self.is_active:
+                if self.status:
+                    if actions.is_status_duration_expired(self.status):
+                        self._end_sequence()
+                    else:
+                        self._continue_sequence()
                     time.sleep(self.queue_wait)
                 else:
                     try:
                         payload = self.queue.get(block=True, timeout=self.queue_wait)
                         self.logger.info(f"Received trigger {payload}")
+                        self._start_sequence()
                     except Empty:
                         self.logger.debug("No trigger fired, starting next cycle.")
 
@@ -78,6 +84,32 @@ class ProcessScaler(BaseThread):
                     return
         finally:
             self.logger.info("Stopped")
+
+    def _start_up(self):
+        statuses = actions.find_status(self.config)
+
+        if not statuses:
+            self.logger.info("Startup: No status for ongoing scaling sequence found.")
+            return
+
+        self.status = statuses.pop(0)
+        self.logger.info("Startup: Found status for ongoing scaling sequence. Resuming.")
+
+        if statuses:
+            self.logger.warning(
+                "Startup: Found multiple statuses for ongoing scaling sequence. Deleting all but newest."
+            )
+            for s in statuses:
+                actions.delete_status(s)
+
+    def _start_sequence(self):
+        pass
+
+    def _continue_sequence(self):
+        pass
+
+    def _end_sequence(self):
+        pass
 
 
 class TriggerConfigMap(BaseThread):
@@ -93,12 +125,12 @@ class TriggerConfigMap(BaseThread):
                     return
 
                 self.logger.debug("Looking for trigger ConfigMap objects.")
-                trigger_cm_list = actions.find_triggers(self.config)
+                trigger_cm_list = actions.find_cm_triggers(self.config)
 
                 if trigger_cm_list:
                     trigger_cm = trigger_cm_list.pop(0)
                     # validate
-                    if actions.validate_trigger(self.config, trigger_cm):
+                    if actions.validate_cm_trigger(self.config, trigger_cm):
                         self.trigger()
                     else:
                         self.logger.warning(
@@ -108,11 +140,11 @@ class TriggerConfigMap(BaseThread):
                             )
                         )
                     # cleanup
-                    actions.delete_trigger(trigger_cm)
+                    actions.delete_cm_trigger(trigger_cm)
                     if trigger_cm_list:
                         self.logger.warning("More than one trigger found. Using most recent. Removing others.")
                         for t in trigger_cm_list:
-                            actions.delete_trigger(t)
+                            actions.delete_cm_trigger(t)
                 else:
                     self.logger.debug("No triggers found")
 

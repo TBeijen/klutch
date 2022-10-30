@@ -19,7 +19,7 @@ def process_triggers(config: Config):
         bool: Whether or not there is a sequence ongoing
     """
     logger.debug("Looking for trigger ConfigMap objects.")
-    trigger_cm_list = actions.find_triggers(config)
+    trigger_cm_list = actions.find_cm_triggers(config)
 
     if not trigger_cm_list:
         logger.debug("No triggers found")
@@ -29,10 +29,10 @@ def process_triggers(config: Config):
     if trigger_cm_list:
         logger.warning("More than one trigger found. Using most recent. Removing others.")
         for t in trigger_cm_list:
-            actions.delete_trigger(t)
+            actions.delete_cm_trigger(t)
 
-    if not actions.validate_trigger(config, trigger_cm):
-        actions.delete_trigger(trigger_cm)
+    if not actions.validate_cm_trigger(config, trigger_cm):
+        actions.delete_cm_trigger(trigger_cm)
         logger.warning(
             "Trigger ConfigMap (name={}, uid={}) is not valid (expired) and has been deleted.".format(
                 trigger_cm.metadata.name,
@@ -71,7 +71,7 @@ def process_triggers(config: Config):
                 )
             )
     created_status_cm = actions.create_status(config, status)
-    actions.delete_trigger(trigger_cm)
+    actions.delete_cm_trigger(trigger_cm)
     logger.info(
         "Finished updating {} HorizontalPodAutoscalers. Status written to ConfigMap (name={}, uid={})".format(
             len(status), created_status_cm.metadata.name, created_status_cm.metadata.uid
@@ -107,7 +107,7 @@ def process_ongoing(config: Config):
         logger.warning("More than one status ConfigMap found. Using most recent. Ignoring others.")
 
     scaled_hpas = json.loads(status_cm.data.get("status"))
-    if not actions.evaluate_status_duration_expired(config, status_cm):
+    if not actions.is_status_duration_expired(config, status_cm):
         logger.info("Sequence ongoing. Reconciling HPAs.")
         for h in scaled_hpas:
             name = h.get("name")

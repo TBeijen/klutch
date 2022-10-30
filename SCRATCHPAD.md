@@ -32,6 +32,13 @@ Threads
 
 * Testing excepthook: https://github.com/pytest-dev/pytest/discussions/9193#discussioncomment-1463715
 
+* k3d e2e tests: https://github.com/marketplace/actions/setup-k3d-k3s
+
+
+TODO:
+* instance key/value on configmap/trigger but also status annotations etc. Allowing multiple klutch to run in same cluster. (Any use case for that?)
+
+
 Old
 
 ```python

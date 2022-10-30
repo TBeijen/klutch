@@ -39,7 +39,7 @@ def get_mock_hpa(name="test-hpa", namespace="test-ns", min_repl=2, max_repl=10, 
     return mock_hpa
 
 
-def test_find_triggers(mock_client, mock_config):
+def test_find_cm_triggers(mock_client, mock_config):
     mock_cm_new = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm_new.metadata.name = "new"
     mock_cm_new.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS)
@@ -54,7 +54,7 @@ def test_find_triggers(mock_client, mock_config):
     mock_cm_list.items = [mock_cm_old, mock_cm_new]
     mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_cm_list
 
-    found = actions.find_triggers(mock_config)
+    found = actions.find_cm_triggers(mock_config)
 
     assert found == [mock_cm_new, mock_cm_old]  # sorted recent first
     mock_client.CoreV1Api().list_namespaced_config_map.assert_called_once_with(
@@ -75,27 +75,30 @@ def test_find_triggers(mock_client, mock_config):
         ),  # 'future' configmaps should be no problem
     ],
 )
-def test_validate_trigger(freezer, creation_timestamp, trigger_max_age, expected, mock_config):
+def test_validate_cm_trigger(freezer, creation_timestamp, trigger_max_age, expected, mock_config):
     freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.creation_timestamp = creation_timestamp
 
     mock_config.trigger_config_map.max_age = trigger_max_age
 
-    assert actions.validate_trigger(mock_config, mock_cm) == expected
+    assert actions.validate_cm_trigger(mock_config, mock_cm) == expected
 
 
-def test_delete_trigger(mock_client):
+def test_delete_cm_trigger(mock_client):
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.name = "foo-name"
     mock_cm.metadata.namespace = "bar-ns"
 
-    actions.delete_trigger(mock_cm)
+    actions.delete_cm_trigger(mock_cm)
 
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
-def test_find_status(mock_client):
+# ==== Above is re-implemented
+
+# OK
+def test_find_status(mock_client, mock_config):
     mock_cm_new = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm_new.metadata.name = "new"
     mock_cm_new.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS)
@@ -103,15 +106,14 @@ def test_find_status(mock_client):
     mock_cm_old.metadata.name = "old"
     mock_cm_old.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS - 100)
 
-    config = get_config(["--namespace=test-ns"])
-    config.cm_status_label_key = "test-status"
-    config.cm_status_label_value = "yes"
+    mock_config.common.cm_status_label_key = "test-status"
+    mock_config.common.cm_status_label_value = "yes"
 
     mock_config_list = MagicMock()
     mock_config_list.items = [mock_cm_old, mock_cm_new]
     mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_config_list
 
-    found = actions.find_status(config)
+    found = actions.find_status(mock_config)
 
     assert found == [mock_cm_new, mock_cm_old]  # sorted recent first
     mock_client.CoreV1Api().list_namespaced_config_map.assert_called_once_with(
@@ -144,6 +146,7 @@ def test_create_status(mock_client):
     assert resp is mock_response
 
 
+# OK
 @pytest.mark.parametrize(
     "creation_timestamp, duration, expected",
     [
@@ -157,14 +160,16 @@ def test_create_status(mock_client):
         ),  # 'future' configmaps should be no problem
     ],
 )
-def test_evaluate_status_duration_expired(freezer, creation_timestamp, duration, expected):
+def test_is_status_duration_expired(freezer, creation_timestamp, duration, expected, mock_config):
     freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.creation_timestamp = creation_timestamp
-    config = get_config(["--namespace=test-ns"])
-    config.duration = duration
+    mock_config.common.duration = duration
 
-    assert actions.evaluate_status_duration_expired(config, mock_cm) == expected
+    assert actions.is_status_duration_expired(mock_config, mock_cm) == expected
+
+
+# OK
 
 
 def test_delete_status(mock_client):

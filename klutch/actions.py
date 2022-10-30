@@ -12,7 +12,7 @@ from klutch.config import KlutchConfig
 logger = logging.getLogger(__name__)
 
 
-def find_triggers(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
+def find_cm_triggers(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
     """Find any configmap labeled as trigger and return it. Recent first."""
     resp = client.CoreV1Api().list_namespaced_config_map(
         config.common.namespace,
@@ -28,24 +28,24 @@ def find_triggers(config: KlutchConfig) -> List[client.models.v1_config_map.V1Co
     )
 
 
-def validate_trigger(config: KlutchConfig, trigger: client.models.v1_config_map.V1ConfigMap) -> bool:
+def validate_cm_trigger(config: KlutchConfig, trigger: client.models.v1_config_map.V1ConfigMap) -> bool:
     """Evaluate trigger ConfigMap age, returning True if valid."""
     cm_ts = trigger.metadata.creation_timestamp.timestamp()
     now = datetime.now().timestamp()
     return cm_ts + config.trigger_config_map.max_age >= now
 
 
-def delete_trigger(trigger: client.models.v1_config_map.V1ConfigMap):
+def delete_cm_trigger(trigger: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(trigger.metadata.name, trigger.metadata.namespace)
 
 
 def find_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
-    """Find any configmap labeled as status and return it. Recent first."""
+    """Find any ConfigMap labeled as status and return it. Recent first."""
     resp = client.CoreV1Api().list_namespaced_config_map(
-        config.namespace,
+        config.common.namespace,
         label_selector="{}={}".format(
-            config.cm_status_label_key,
-            config.cm_status_label_value,
+            config.common.cm_status_label_key,
+            config.common.cm_status_label_value,
         ),
     )
     return sorted(
@@ -53,6 +53,8 @@ def find_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1Conf
         key=lambda n: n.metadata.creation_timestamp.timestamp(),
         reverse=True,
     )
+
+    # ==== Above is re-implemented
 
 
 def create_status(config, status: list):
@@ -66,10 +68,11 @@ def create_status(config, status: list):
     return client.CoreV1Api().create_namespaced_config_map(config.namespace, config_map)
 
 
-def evaluate_status_duration_expired(config, status: client.models.v1_config_map.V1ConfigMap) -> bool:
+def is_status_duration_expired(config: KlutchConfig, status: client.models.v1_config_map.V1ConfigMap) -> bool:
+    """Return True if duration of scaling sequence has expired."""
     cm_ts = status.metadata.creation_timestamp.timestamp()
     now = datetime.now().timestamp()
-    return cm_ts + config.duration < now
+    return cm_ts + config.common.duration < now
 
 
 def delete_status(status: client.models.v1_config_map.V1ConfigMap):
