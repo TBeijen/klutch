@@ -174,25 +174,38 @@ def test_delete_status(mock_client):
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
-# ==== Above is re-implemented
+@pytest.mark.parametrize(
+    "annotation_key, annotation_value, should_be_included",
+    [
+        ("proper_annotation_key", "1", True),
+        ("proper_annotation_key", "0", False),
+        ("proper_annotation_key", "foobar", False),
+        ("incorrect_annotation_key", "1", False),
+    ],
+)
+def test_find_hpas(mock_client, mock_config, annotation_key, annotation_value, should_be_included):
+    # This one should never be included
+    mock_hpa1 = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
+    mock_hpa1.metadata.annotations = {"proper_annotation_key": "1"}
+    # This one should be included based on test parameters
+    mock_hpa2 = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
+    mock_hpa2.metadata.annotations = {annotation_key: annotation_value}
 
-
-def test_find_hpas(mock_client):
-    mock_hpa_enabled = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
-    mock_hpa_enabled.metadata.annotations = {"klutch-enabled": "any-value-goes"}
-    mock_hpa_disabled = MagicMock(spec=client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler)
-    mock_hpa_disabled.metadata.annotations = {}
-
-    config = get_config(["--namespace=test-ns"])
-    config.hpa_annotation_enabled = "klutch-enabled"
+    mock_config.common.hpa_annotation_enabled_key = "proper_annotation_key"
+    mock_config.common.hpa_annotation_enabled_value = "1"
 
     mock_hpa_list = MagicMock()
-    mock_hpa_list.items = [mock_hpa_disabled, mock_hpa_enabled]
+    mock_hpa_list.items = [mock_hpa1, mock_hpa2]
     mock_client.AutoscalingV1Api().list_horizontal_pod_autoscaler_for_all_namespaces.return_value = mock_hpa_list
 
-    found = actions.find_hpas(config)
+    found = actions.find_hpas(mock_config)
+    found = list(found)
 
-    assert list(found) == [mock_hpa_enabled]
+    assert mock_hpa1 in found
+    assert (mock_hpa2 in found) is should_be_included
+
+
+# ==== Above is re-implemented
 
 
 @pytest.mark.parametrize(

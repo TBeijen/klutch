@@ -39,7 +39,8 @@ class CommonSection(CommonSectionMixin, ConfigSection):
     klutch_namespace: str = ""
 
     # Should not typically need changing: Annotation names used to configure klutch to act on HPAs
-    hpa_annotation_enabled: str = "klutch.it/enabled"
+    hpa_annotation_enabled_key: str = "klutch.it/enabled"
+    hpa_annotation_enabled_value: str = "1"
     hpa_annotation_scale_perc_of_actual: str = "klutch.it/scale-percentage-of-actual"
 
     # Should not typically need changing: Annotation name used to store state data while scaling is in progress

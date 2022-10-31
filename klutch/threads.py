@@ -103,6 +103,9 @@ class ProcessScaler(BaseThread):
                 actions.delete_status(s)
 
     def _start_sequence(self):
+        """Start scaling sequence: Find HPAs, scale up an write status."""
+        hpas = actions.find_hpas(self.config)
+
         pass
 
     def _continue_sequence(self):

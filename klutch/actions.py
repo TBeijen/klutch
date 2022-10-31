@@ -77,15 +77,17 @@ def delete_status(status: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(status.metadata.name, status.metadata.namespace)
 
 
-# ==== Above is re-implemented
-
-
 def find_hpas(
     config: KlutchConfig,
 ) -> Iterable[client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler]:
     """Find any HorizontalPodAutoscaler having klutch annotation."""
     resp = client.AutoscalingV1Api().list_horizontal_pod_autoscaler_for_all_namespaces()
-    return filter(lambda h: config.hpa_annotation_enabled in h.metadata.annotations, resp.items)
+    k = config.common.hpa_annotation_enabled_key
+    v = config.common.hpa_annotation_enabled_value
+    return filter(lambda h: h.metadata.annotations.get(k, None) == v, resp.items)
+
+
+# ==== Above is re-implemented
 
 
 def scale_hpa(
