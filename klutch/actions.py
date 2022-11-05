@@ -76,7 +76,7 @@ def is_status_duration_expired(config: KlutchConfig, status: client.models.v1_co
     return cm_ts + config.common.duration < now
 
 
-def delete_status(status: client.models.v1_config_map.V1ConfigMap):
+def delete_cm_status(status: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(status.metadata.name, status.metadata.namespace)
 
 
@@ -141,51 +141,6 @@ def scale_hpa(
 
 
 # ==== Above is re-implemented
-
-
-def scale_hpa_ori(
-    config: KlutchConfig,
-    hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler,
-) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
-    """Scale up hpa. Write status in annotation. Return patched hpa."""
-    # Raises ValueError or TypeError if value can not pe parsed into int
-    scale_perc_of_actual = int(hpa.metadata.annotations.get(config.hpa_annotation_scale_perc_of_actual))
-    if hpa.metadata.annotations.get(config.hpa_annotation_status):
-        raise ValueError("Can not scale up HPA. Already has been scaled up.")
-
-    # values used in patching and logging
-    name = hpa.metadata.name
-    namespace = hpa.metadata.namespace
-    uid = hpa.metadata.uid
-    spec_min_replicas = hpa.spec.min_replicas
-    spec_max_replicas = hpa.spec.max_replicas
-    target_min_replicas = math.ceil(hpa.status.current_replicas * scale_perc_of_actual / 100)
-
-    if target_min_replicas <= spec_min_replicas:
-        raise ValueError("Can not scale up HPA, would decrease minReplicas (deployment not correctly started?).")
-
-    if target_min_replicas > spec_max_replicas:
-        logger.warning(
-            f"Limiting minReplicas to maxReplicas value of {spec_max_replicas} instead of intended value {target_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"
-        )
-        target_min_replicas = hpa.spec.max_replicas
-
-    status = {
-        "originalMinReplicas": hpa.spec.min_replicas,
-        "originalCurrentReplicas": hpa.status.current_replicas,
-        "appliedMinReplicas": target_min_replicas,
-        "appliedAt": int(datetime.now().timestamp()),
-    }
-    patch = {
-        "metadata": {"annotations": {config.hpa_annotation_status: json.dumps(status)}},
-        "spec": {"minReplicas": target_min_replicas},
-    }
-    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch)
-    logger.info(
-        f"Scaled minReplicas from {spec_min_replicas} to {target_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"
-    )
-
-    return patched_hpa
 
 
 def reconcile_hpa(

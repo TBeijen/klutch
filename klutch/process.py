@@ -145,7 +145,7 @@ def process_ongoing(config: Config):
                         err=str(e),
                     )
                 )
-        actions.delete_status(status_cm)
+        actions.delete_cm_status(status_cm)
         return False
 
 

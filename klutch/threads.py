@@ -70,7 +70,7 @@ class ProcessScaler(BaseThread):
                         self._end_sequence()
                     else:
                         self._continue_sequence()
-                    time.sleep(self.queue_wait)
+                    time.sleep(self.reconcile_interval)
                 else:
                     try:
                         payload = self.queue.get(block=True, timeout=self.queue_wait)
@@ -86,27 +86,31 @@ class ProcessScaler(BaseThread):
             self.logger.info("Stopped")
 
     def _start_up(self):
+        """Startup: Find any scaling status ConfigMap that might exist and resume if found."""
         statuses = actions.find_cm_status(self.config)
-
         if not statuses:
             self.logger.info("Startup: No status for ongoing scaling sequence found.")
             return
-
         self.status = statuses.pop(0)
         self.logger.info("Startup: Found status for ongoing scaling sequence. Resuming.")
-
         if statuses:
             self.logger.warning(
                 "Startup: Found multiple statuses for ongoing scaling sequence. Deleting all but newest."
             )
             for s in statuses:
-                actions.delete_status(s)
+                actions.delete_cm_status(s)
 
     def _start_sequence(self):
         """Start scaling sequence: Find HPAs, scale up an write status."""
+        self.status = []
         hpas = actions.find_hpas(self.config)
-
-        pass
+        for hpa in hpas:
+            try:
+                hpa_status, patched_hpa = actions.scale_hpa(self.config, hpa, self.logger)
+                self.status.append(hpa_status)
+            except Exception as e:
+                self.logger.exception()
+        actions.create_cm_status(self.status)
 
     def _continue_sequence(self):
         pass

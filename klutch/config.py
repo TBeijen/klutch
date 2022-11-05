@@ -31,7 +31,7 @@ class CommonSection(CommonSectionMixin, ConfigSection):
     debug: bool = False
     # Period (seconds) after which to restore original values
     duration: int = 300
-    # Interval (seconds) used to reconcile hpa status
+    # Interval (seconds) used to reconcile hpa status or end scaling sequence
     reconcile_interval: int = 10
     # Interval (seconds) used to scan for orphans
     scan_orphans_duration: int = 600
