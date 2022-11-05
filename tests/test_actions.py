@@ -1,4 +1,5 @@
 import json
+import logging
 from contextlib import ExitStack as does_not_raise
 from datetime import datetime
 from unittest.mock import MagicMock
@@ -8,9 +9,12 @@ import pytest
 from kubernetes import client
 
 from klutch import actions
-from klutch.config import config
+from klutch.config import config as klutch_config
 
 REFERENCE_TS = 1500000000
+
+
+dummy_logger = logging.Logger("test dummy")
 
 
 @pytest.fixture
@@ -22,7 +26,7 @@ def mock_client(monkeypatch):
 
 @pytest.fixture
 def mock_config():
-    mock_config = Mock(config)
+    mock_config = Mock(klutch_config)
     mock_config.common.namespace = "test-ns"
     return mock_config
 
@@ -95,7 +99,7 @@ def test_delete_cm_trigger(mock_client):
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
 
-def test_find_status(mock_client, mock_config):
+def test_find_cm_status(mock_client, mock_config):
     mock_cm_new = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm_new.metadata.name = "new"
     mock_cm_new.metadata.creation_timestamp = datetime.fromtimestamp(REFERENCE_TS)
@@ -110,7 +114,7 @@ def test_find_status(mock_client, mock_config):
     mock_config_list.items = [mock_cm_old, mock_cm_new]
     mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_config_list
 
-    found = actions.find_status(mock_config)
+    found = actions.find_cm_status(mock_config)
 
     assert found == [mock_cm_new, mock_cm_old]  # sorted recent first
     mock_client.CoreV1Api().list_namespaced_config_map.assert_called_once_with(
@@ -118,7 +122,7 @@ def test_find_status(mock_client, mock_config):
     )
 
 
-def test_create_status(mock_client, mock_config):
+def test_create_cm_status(mock_client, mock_config):
     mock_config.common.cm_status_name = "kl-status-name"
     mock_config.common.cm_status_label_key = "kl-status"
     mock_config.common.cm_status_label_value = "yes"
@@ -130,7 +134,7 @@ def test_create_status(mock_client, mock_config):
     # Prevent models instantiated in sut to be mocks as well
     mock_client.models = client.models
 
-    resp = actions.create_status(mock_config, status)
+    resp = actions.create_cm_status(mock_config, status)
 
     call_args = mock_client.CoreV1Api().create_namespaced_config_map.call_args_list
     assert len(call_args) == 1
@@ -164,12 +168,12 @@ def test_is_status_duration_expired(freezer, creation_timestamp, duration, expec
     assert actions.is_status_duration_expired(mock_config, mock_cm) == expected
 
 
-def test_delete_status(mock_client):
+def test_delete_cm_status(mock_client):
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.name = "foo-name"
     mock_cm.metadata.namespace = "bar-ns"
 
-    actions.delete_status(mock_cm)
+    actions.delete_cm_status(mock_cm)
 
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 
@@ -222,6 +226,7 @@ def test_find_hpas(mock_client, mock_config, annotation_key, annotation_value, s
 def test_scale_hpa_patches(
     freezer,
     mock_client,
+    mock_config,
     hpa_min_r,
     hpa_max_r,
     hpa_current_r,
@@ -232,9 +237,8 @@ def test_scale_hpa_patches(
 ):
     freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
     # Setting custom annotation key to test if config is used
-    config = get_config(["--namespace=test-ns"])
-    config.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
-    config.hpa_annotation_status = "kl-status"
+    mock_config.common.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
+    mock_config.common.hpa_annotation_status = "kl-status"
 
     mock_original_hpa = get_mock_hpa(
         name="test-hpa",
@@ -248,7 +252,6 @@ def test_scale_hpa_patches(
     mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
 
     with expected_exception:
-        ret_value = actions.scale_hpa(config, mock_original_hpa)
 
         expected_patch_body = {
             "metadata": {
@@ -265,22 +268,24 @@ def test_scale_hpa_patches(
             },
             "spec": {"minReplicas": expected_min_r},
         }
+
+        returned_status, returned_hpa = actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
+
         mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
             "test-hpa", "test-ns", expected_patch_body
         )
-        assert ret_value is mock_patched_hpa
+        assert returned_hpa is mock_patched_hpa
 
 
-def test_scale_hpa_raises_if_annotation_found(mock_client):
+def test_scale_hpa_raises_if_annotation_found(mock_client, mock_config):
     # Setting custom annotation key to test if config is used
-    config = get_config(["--namespace=test-ns"])
-    config.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
-    config.hpa_annotation_status = "kl-status"
+    mock_config.common.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
+    mock_config.common.hpa_annotation_status = "kl-status"
 
     mock_original_hpa = get_mock_hpa(annotations={"kl-status": "some-json", "kl-scale-to": "200"})
 
     with pytest.raises(ValueError):
-        actions.scale_hpa(config, mock_original_hpa)
+        actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
 
 
 @pytest.mark.parametrize(

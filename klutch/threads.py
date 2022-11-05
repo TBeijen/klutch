@@ -86,7 +86,7 @@ class ProcessScaler(BaseThread):
             self.logger.info("Stopped")
 
     def _start_up(self):
-        statuses = actions.find_status(self.config)
+        statuses = actions.find_cm_status(self.config)
 
         if not statuses:
             self.logger.info("Startup: No status for ongoing scaling sequence found.")

@@ -1,8 +1,13 @@
 import json
 import logging
 
+# type: ignore
+
+# noreorder
+
 from klutch import actions
 from klutch.config import Config
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +57,8 @@ def process_triggers(config: Config):
     status = []
     for hpa in actions.find_hpas(config):
         try:
-            patched_hpa = actions.scale_hpa(config, hpa)
-            patched_hpa_status = json.loads(patched_hpa.metadata.annotations.get(config.hpa_annotation_status))
+            _, patched_hpa = actions.scale_hpa(config, hpa, logger)
+            patched_hpa_status = json.loads(patched_hpa.metadata.annotations.get(config.common.hpa_annotation_status))
             entry = {
                 "name": patched_hpa.metadata.name,
                 "namespace": patched_hpa.metadata.namespace,
@@ -70,7 +75,7 @@ def process_triggers(config: Config):
                     err=str(e),
                 )
             )
-    created_status_cm = actions.create_status(config, status)
+    created_status_cm = actions.create_cm_status(config, status)
     actions.delete_cm_trigger(trigger_cm)
     logger.info(
         "Finished updating {} HorizontalPodAutoscalers. Status written to ConfigMap (name={}, uid={})".format(
@@ -96,7 +101,7 @@ def process_ongoing(config: Config):
         bool: Whether or not there is a sequence ongoing
     """
     logger.debug("Looking for status ConfigMap objects.")
-    status_cm_list = actions.find_status(config)
+    status_cm_list = actions.find_cm_status(config)
 
     if not status_cm_list:
         logger.debug("No status found")
@@ -157,7 +162,7 @@ def process_orphans(config: Config):
         bool: Whether or not there is a sequence ongoing
     """
     logger.info("Searching for orphan HorizontalPodAutoscalers that need to be reverted.")
-    if actions.find_status(config=config):
+    if actions.find_cm_status(config=config):
         raise RuntimeError("Can not process orphans if status exists.")
     for hpa in actions.find_hpas(config):
         if config.hpa_annotation_status in hpa.metadata.annotations:

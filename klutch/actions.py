@@ -4,10 +4,13 @@ import math
 from datetime import datetime
 from typing import Iterable
 from typing import List
+from typing import Tuple
 
 from kubernetes import client  # type: ignore
 
 from klutch.config import KlutchConfig
+from klutch.status import create_hpa_status
+from klutch.status import HpaStatus
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +42,7 @@ def delete_cm_trigger(trigger: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(trigger.metadata.name, trigger.metadata.namespace)
 
 
-def find_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
+def find_cm_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1ConfigMap]:
     """Find any ConfigMap labeled as status and return it. Recent first."""
     resp = client.CoreV1Api().list_namespaced_config_map(
         config.common.namespace,
@@ -55,7 +58,7 @@ def find_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1Conf
     )
 
 
-def create_status(config: KlutchConfig, status: list):
+def create_cm_status(config: KlutchConfig, status: list):
     config_map = client.models.v1_config_map.V1ConfigMap(
         data={"status": json.dumps(status)},
         metadata=client.models.V1ObjectMeta(
@@ -87,10 +90,60 @@ def find_hpas(
     return filter(lambda h: h.metadata.annotations.get(k, None) == v, resp.items)
 
 
+def scale_hpa(
+    config: KlutchConfig,
+    hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler,
+    logger: logging.Logger,
+) -> Tuple[HpaStatus, client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler]:
+    """
+    Scale up HPA. Return status as well as patched HPA.
+
+    Raises: ValueError, TypeError
+    """
+
+    hpa_repr = _hpa_repr(hpa)
+    scale_perc_of_actual = int(hpa.metadata.annotations.get(config.common.hpa_annotation_scale_perc_of_actual))
+
+    if hpa.metadata.annotations.get(config.common.hpa_annotation_status):
+        raise ValueError(f"Can not scale up {hpa_repr}. Already has been scaled up.")
+
+    spec_min_replicas = hpa.spec.min_replicas
+    spec_max_replicas = hpa.spec.max_replicas
+
+    # Calculate and validate scale target
+    scale_target_min_replicas = math.ceil(hpa.status.current_replicas * scale_perc_of_actual / 100)
+
+    if scale_target_min_replicas <= spec_min_replicas:
+        raise ValueError(
+            f"Can not scale up {hpa_repr}: Would decrease minReplicas (deployment not correctly started?)."
+        )
+
+    if scale_target_min_replicas > spec_max_replicas:
+        logger.warning(
+            f"Limiting minReplicas to maxReplicas value of {spec_max_replicas} instead of intended value {scale_target_min_replicas} for {hpa_repr})"
+        )
+        scale_target_min_replicas = hpa.spec.max_replicas
+
+    # Patch HPA with scale target and status data
+    hpa_status = create_hpa_status(scale_target_min_replicas, hpa)
+    patch = {
+        "metadata": {
+            "annotations": {config.common.hpa_annotation_status: json.dumps(hpa_status.dict().get("status"))}
+        },
+        "spec": {"minReplicas": scale_target_min_replicas},
+    }
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(
+        hpa.metadata.name, hpa.metadata.namespace, patch
+    )
+    logger.info(f"Scaled minReplicas from {spec_min_replicas} to {scale_target_min_replicas} for {hpa_repr}")
+
+    return hpa_status, patched_hpa
+
+
 # ==== Above is re-implemented
 
 
-def scale_hpa(
+def scale_hpa_ori(
     config: KlutchConfig,
     hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler,
 ) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
@@ -192,3 +245,13 @@ def revert_hpa(
         )
     )
     return patched_hpa
+
+
+def _hpa_repr(hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler):
+    """Return string representation of HPA for logging purposes."""
+
+    name = hpa.metadata.name
+    namespace = hpa.metadata.namespace
+    uid = hpa.metadata.uid
+
+    return f"HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"
