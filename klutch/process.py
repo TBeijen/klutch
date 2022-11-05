@@ -86,94 +86,94 @@ logger = logging.getLogger(__name__)
 #     return True
 
 
-def process_ongoing(config: Config):
-    """Search for current status ConfigMap and act accordingly.
+# def process_ongoing(config: Config):
+#     """Search for current status ConfigMap and act accordingly.
 
-    Either consolidates, or restores autoscalers to their original minReplicas.
+#     Either consolidates, or restores autoscalers to their original minReplicas.
 
-    Consolidating will happen based on found status, and will set any HPA to their scaled-up state.
-    This means that HPAs reverted by CI/CD deploys will be set back to their scaled-up state within the duration of the control loop.
+#     Consolidating will happen based on found status, and will set any HPA to their scaled-up state.
+#     This means that HPAs reverted by CI/CD deploys will be set back to their scaled-up state within the duration of the control loop.
 
-    Args:
-        config: Config instance
+#     Args:
+#         config: Config instance
 
-    Returns:
-        bool: Whether or not there is a sequence ongoing
-    """
-    logger.debug("Looking for status ConfigMap objects.")
-    status_cm_list = actions.find_cm_status(config)
+#     Returns:
+#         bool: Whether or not there is a sequence ongoing
+#     """
+#     logger.debug("Looking for status ConfigMap objects.")
+#     status_cm_list = actions.find_cm_status(config)
 
-    if not status_cm_list:
-        logger.debug("No status found")
-        return False
+#     if not status_cm_list:
+#         logger.debug("No status found")
+#         return False
 
-    status_cm = status_cm_list.pop(0)
-    if status_cm_list:
-        logger.warning("More than one status ConfigMap found. Using most recent. Ignoring others.")
+#     status_cm = status_cm_list.pop(0)
+#     if status_cm_list:
+#         logger.warning("More than one status ConfigMap found. Using most recent. Ignoring others.")
 
-    scaled_hpas = json.loads(status_cm.data.get("status"))
-    if not actions.is_status_duration_expired(config, status_cm):
-        logger.info("Sequence ongoing. Reconciling HPAs.")
-        for h in scaled_hpas:
-            name = h.get("name")
-            namespace = h.get("namespace")
-            try:
-                actions.reconcile_hpa(
-                    config=config, name=name, namespace=namespace, klutch_hpa_status=h.get("status")
-                )
-            except Exception as e:
-                logger.error(
-                    "Error while reconciling HorizontalPodAutoscaler (namespace={ns}, name={name}). Reason: {err}".format(
-                        ns=namespace,
-                        name=name,
-                        err=str(e),
-                    )
-                )
-        return True
-    else:
-        logger.info("Sequence duration expired. Reverting HPAs.")
-        for h in scaled_hpas:
-            name = h.get("name")
-            namespace = h.get("namespace")
-            try:
-                actions.revert_hpa(config=config, name=name, namespace=namespace, klutch_hpa_status=h.get("status"))
-            except Exception as e:
-                logger.error(
-                    "Error while reverting HorizontalPodAutoscaler (namespace={ns}, name={name}). Reason: {err}".format(
-                        ns=namespace,
-                        name=name,
-                        err=str(e),
-                    )
-                )
-        actions.delete_cm_status(status_cm)
-        return False
+#     scaled_hpas = json.loads(status_cm.data.get("status"))
+#     if not actions.is_status_duration_expired(config, status_cm):
+#         logger.info("Sequence ongoing. Reconciling HPAs.")
+#         for h in scaled_hpas:
+#             name = h.get("name")
+#             namespace = h.get("namespace")
+#             try:
+#                 actions.reconcile_hpa(
+#                     config=config, name=name, namespace=namespace, klutch_hpa_status=h.get("status")
+#                 )
+#             except Exception as e:
+#                 logger.error(
+#                     "Error while reconciling HorizontalPodAutoscaler (namespace={ns}, name={name}). Reason: {err}".format(
+#                         ns=namespace,
+#                         name=name,
+#                         err=str(e),
+#                     )
+#                 )
+#         return True
+#     else:
+#         logger.info("Sequence duration expired. Reverting HPAs.")
+#         for h in scaled_hpas:
+#             name = h.get("name")
+#             namespace = h.get("namespace")
+#             try:
+#                 actions.revert_hpa(config=config, name=name, namespace=namespace, klutch_hpa_status=h.get("status"))
+#             except Exception as e:
+#                 logger.error(
+#                     "Error while reverting HorizontalPodAutoscaler (namespace={ns}, name={name}). Reason: {err}".format(
+#                         ns=namespace,
+#                         name=name,
+#                         err=str(e),
+#                     )
+#                 )
+#         actions.delete_cm_status(status_cm)
+#         return False
 
 
-def process_orphans(config: Config):
-    """Examine HPAs for annotations indicating sequence not finished and restore them to their original state.
+# def process_orphans(config: Config):
+#     """Examine HPAs for annotations indicating sequence not finished and restore them to their original state.
 
-    This should do nothing, however there's always the possibility that a status configmap gets accidentally deleted,
-    without the HPAs being restored to their original state.
+#     This should do nothing, however there's always the possibility that a status configmap gets accidentally deleted,
+#     without the HPAs being restored to their original state.
 
-    Args:
-        config: Config instance
+#     Args:
+#         config: Config instance
 
-    Returns:
-        bool: Whether or not there is a sequence ongoing
-    """
-    logger.info("Searching for orphan HorizontalPodAutoscalers that need to be reverted.")
-    if actions.find_cm_status(config=config):
-        raise RuntimeError("Can not process orphans if status exists.")
-    for hpa in actions.find_hpas(config):
-        if config.hpa_annotation_status in hpa.metadata.annotations:
-            name = hpa.metadata.name
-            ns = hpa.metadata.namespace
-            logger.warning(
-                f"Found HorizontalPodAutoscaler (namespace={ns}, name={name}) having status annotation, reverting."
-            )
-            actions.revert_hpa(
-                config=config,
-                name=name,
-                namespace=ns,
-                klutch_hpa_status=json.loads(hpa.metadata.annotations.get(config.hpa_annotation_status)),
-            )
+#     Returns:
+#         bool: Whether or not there is a sequence ongoing
+#     """
+#     logger.info("Searching for orphan HorizontalPodAutoscalers that need to be reverted.")
+#     if actions.find_cm_status(config=config):
+#         raise RuntimeError("Can not process orphans if status exists.")
+#     for hpa in actions.find_hpas(config):
+#         if config.hpa_annotation_status in hpa.metadata.annotations:
+#             name = hpa.metadata.name
+#             ns = hpa.metadata.namespace
+#             logger.warning(
+#                 f"Found HorizontalPodAutoscaler (namespace={ns}, name={name}) having status annotation, reverting."
+#             )
+#             actions.revert_hpa(
+#                 config=config,
+#                 name=name,
+#                 namespace=ns,
+#                 klutch_hpa_status=json.loads(hpa.metadata.annotations.get(config.hpa_annotation_status)),
+#             )

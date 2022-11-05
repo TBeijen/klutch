@@ -140,73 +140,70 @@ def scale_hpa(
     return hpa_status, patched_hpa
 
 
-# ==== Above is re-implemented
-
-
-def reconcile_hpa(
-    config: KlutchConfig, name: str, namespace: str, klutch_hpa_status
-) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
-    """Examine hpa and ensure minReplicas has overdrive value and annotation is set."""
-    # load hpa first to determine if annotation hasn't been removed (will make patch fail)
-    patch = []
-    hpa = client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler(name, namespace)
-
-    if config.hpa_annotation_status not in hpa.metadata.annotations:
-        patch.append(
-            {
-                "op": "add",
-                "path": "/metadata/annotations/{}".format(config.hpa_annotation_status.replace("/", "~1")),
-                "value": json.dumps(klutch_hpa_status),
-            }
-        )
-    if hpa.spec.min_replicas != klutch_hpa_status.get("appliedMinReplicas"):
-        patch.append(
-            {"op": "replace", "path": "/spec/minReplicas", "value": klutch_hpa_status.get("appliedMinReplicas")}
-        )
-    if not patch:
-        logger.debug("No reconcile needed for hpa (name={}, namespace={})".format(name, namespace))
-        return hpa
-    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch)
-    logger.info("Reconciled hpa (name={}, namespace={})".format(name, namespace))
-    return patched_hpa
-
-
 def revert_hpa(
-    config: KlutchConfig, name: str, namespace: str, klutch_hpa_status
+    config: KlutchConfig, hpa_status: HpaStatus, logger: logging.Logger
 ) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
     """Restore minReplicas to original value and remove status annotation."""
-    # load hpa first to determine if annotation hasn't been removed (will make patch fail)
-    hpa = client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler(name, namespace)
 
+    # Load hpa first to determine if annotation hasn't been removed (e.g. by a deployment) which would cause patch to fail
+    hpa = client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler(hpa_status.name, hpa_status.namespace)
     patch = [
-        {"op": "replace", "path": "/spec/minReplicas", "value": klutch_hpa_status.get("originalMinReplicas")},
+        {"op": "replace", "path": "/spec/minReplicas", "value": hpa_status.status.originalMinReplicas},
     ]
-    if config.hpa_annotation_status in hpa.metadata.annotations:
+    if config.common.hpa_annotation_status in hpa.metadata.annotations:
         patch.append(
             {
                 "op": "remove",
-                "path": "/metadata/annotations/{}".format(config.hpa_annotation_status.replace("/", "~1")),
+                "path": "/metadata/annotations/{}".format(config.common.hpa_annotation_status.replace("/", "~1")),
             }
         )
 
-    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(name, namespace, patch)
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(
+        hpa_status.name, hpa_status.namespace, patch
+    )
     logger.info(
-        "Scaled minReplicas from {applied_min_replicas} to {original_min_replicas} for HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})".format(
-            name=name,
-            namespace=namespace,
-            uid=patched_hpa.metadata.uid,
-            applied_min_replicas=klutch_hpa_status.get("appliedMinReplicas"),
-            original_min_replicas=klutch_hpa_status.get("originalMinReplicas"),
+        "Scaled minReplicas from {applied_min_replicas} to {original_min_replicas} for {repr})".format(
+            repr=_hpa_repr(patched_hpa),
+            applied_min_replicas=hpa_status.status.appliedMinReplicas,
+            original_min_replicas=hpa_status.status.originalMinReplicas,
         )
     )
     return patched_hpa
 
 
+def reconcile_hpa(
+    config: KlutchConfig, hpa_status: HpaStatus, logger: logging.Logger
+) -> client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler:
+    """Examine HPA and ensure minReplicas has overdrive value and annotation is set."""
+
+    # Load hpa first to determine if annotation hasn't been removed (e.g. by a deployment) which would cause patch to fail
+    hpa = client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler(hpa_status.name, hpa_status.namespace)
+    repr = _hpa_repr(hpa)
+    patch = []
+
+    if config.common.hpa_annotation_status not in hpa.metadata.annotations:
+        patch.append(
+            {
+                "op": "add",
+                "path": "/metadata/annotations/{}".format(config.common.hpa_annotation_status.replace("/", "~1")),
+                "value": json.dumps(hpa_status.dict().get("status")),
+            }
+        )
+    if hpa.spec.min_replicas != hpa_status.status.appliedMinReplicas:
+        patch.append({"op": "replace", "path": "/spec/minReplicas", "value": hpa_status.status.appliedMinReplicas})  # type: ignore
+    if not patch:
+        logger.debug(f"No reconcile needed for {repr})")
+        return hpa
+    patched_hpa = client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler(
+        hpa_status.name, hpa_status.namespace, patch
+    )
+    logger.info("Reconciled {repr}")
+    return patched_hpa
+
+
 def _hpa_repr(hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler):
     """Return string representation of HPA for logging purposes."""
-
     name = hpa.metadata.name
     namespace = hpa.metadata.namespace
     uid = hpa.metadata.uid
-
     return f"HorizontalPodAutoscaler (namespace={namespace}, name={name}, uid={uid})"

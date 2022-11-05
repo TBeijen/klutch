@@ -298,51 +298,9 @@ def test_scale_hpa_raises_if_annotation_found(mock_client, mock_config):
         actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
 
 
-# ==== Above is re-implemented
-
-
-@pytest.mark.parametrize(
-    "has_patch_annotation, hpa_min_replicas, should_patch",
-    [
-        (True, 4, False),
-        (True, 2, True),
-        (False, 4, True),
-        (False, 2, True),
-        (False, 6, True),  # Also reconcile if for some odd reason minReplicas is higher than appliedMinReplicas
-    ],
-)
-def test_reconcile_hpa_patches(mock_client, has_patch_annotation, hpa_min_replicas, should_patch):
-    config = get_config(["--namespace=test-ns"])
-    config.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
-
-    hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
-    mock_read_hpa = get_mock_hpa(annotations=hpa_annot, min_repl=hpa_min_replicas)
-    mock_patched_hpa = get_mock_hpa()
-    mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.return_value = mock_read_hpa
-    mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
-
-    ret_value = actions.reconcile_hpa(config, "test-name", "test-ns", {"appliedMinReplicas": 4})
-
-    patch_annot = {"op": "add", "path": "/metadata/annotations/kl~1status", "value": '{"appliedMinReplicas": 4}'}
-    patch_spec = {"op": "replace", "path": "/spec/minReplicas", "value": 4}
-
-    if not should_patch:
-        mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_not_called()
-        assert ret_value is mock_read_hpa
-    else:
-        assert len(mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list) == 1
-        assert ret_value is mock_patched_hpa
-        args = mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list[0].args
-        assert args[0] == "test-name"
-        assert args[1] == "test-ns"
-        assert (patch_annot in args[2]) is not has_patch_annotation
-        assert (patch_spec in args[2]) is not (hpa_min_replicas == 4)
-
-
 @pytest.mark.parametrize("has_patch_annotation", [True, False])
-def test_revert_hpa_patches(mock_client, has_patch_annotation):
-    config = get_config(["--namespace=test-ns"])
-    config.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
+def test_revert_hpa_patches(mock_client, mock_config, has_patch_annotation):
+    mock_config.common.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
 
     hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
     mock_read_hpa = get_mock_hpa(annotations=hpa_annot)
@@ -350,7 +308,17 @@ def test_revert_hpa_patches(mock_client, has_patch_annotation):
     mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.return_value = mock_read_hpa
     mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
 
-    ret_value = actions.revert_hpa(config, "test-name", "test-ns", {"originalMinReplicas": 4})
+    hpa_status = HpaStatus(
+        name="test-name",
+        namespace="test-ns",
+        status=StatusData(
+            originalMinReplicas=4,
+            originalCurrentReplicas=5,
+            appliedMinReplicas=8,
+            appliedAt=REFERENCE_TS,
+        ),
+    )
+    ret_value = actions.revert_hpa(mock_config, hpa_status, dummy_logger)
 
     # should have loaded hpa using name and ns
     mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
@@ -366,3 +334,59 @@ def test_revert_hpa_patches(mock_client, has_patch_annotation):
     assert len(args[2]) == 2 if has_patch_annotation else 1
     if has_patch_annotation:
         assert {"op": "remove", "path": "/metadata/annotations/kl~1status"} in args[2]
+
+
+@pytest.mark.parametrize(
+    "has_patch_annotation, hpa_min_replicas, should_patch",
+    [
+        (True, 4, False),
+        (True, 2, True),
+        (False, 4, True),
+        (False, 2, True),
+        (False, 6, True),  # Also reconcile if for some odd reason minReplicas is higher than appliedMinReplicas
+    ],
+)
+def test_reconcile_hpa_patches(mock_client, mock_config, has_patch_annotation, hpa_min_replicas, should_patch):
+    mock_config.common.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
+
+    hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
+    mock_read_hpa = get_mock_hpa(annotations=hpa_annot, min_repl=hpa_min_replicas)
+    mock_patched_hpa = get_mock_hpa()
+    mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.return_value = mock_read_hpa
+    mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
+
+    hpa_status = HpaStatus(
+        name="test-name",
+        namespace="test-ns",
+        status=StatusData(
+            originalMinReplicas=2,
+            originalCurrentReplicas=2,
+            appliedMinReplicas=4,
+            appliedAt=REFERENCE_TS,
+        ),
+    )
+    ret_value = actions.reconcile_hpa(mock_config, hpa_status, dummy_logger)
+
+    patch_annot = {"op": "add", "path": "/metadata/annotations/kl~1status", "value": '{"appliedMinReplicas": 4}'}
+    patch_spec = {"op": "replace", "path": "/spec/minReplicas", "value": 4}
+
+    if not should_patch:
+        mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_not_called()
+        assert ret_value is mock_read_hpa
+    else:
+        assert len(mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list) == 1
+        assert ret_value is mock_patched_hpa
+        args = mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.call_args_list[0].args
+        assert args[0] == "test-name"
+        assert args[1] == "test-ns"
+        # Finding the spec and annotation patch components in the arg to patch the hpa
+        patch_element_spec = [p for p in args[2] if p.get("op") == "replace"]
+        patch_element_annot = [p for p in args[2] if p.get("op") == "add"]
+        # Only if original hpa not yet had annotation, the expected annotation should be included in the patch
+        if not has_patch_annotation:
+            assert patch_element_annot[0]["path"] == "/metadata/annotations/kl~1status"
+            assert json.loads(patch_element_annot[0]["value"]) == hpa_status.dict().get("status")
+        # Only if HPA min replicas differs from what has been applied as scale target, should spec be included in the patch
+        if not (hpa_min_replicas == 4):
+            assert patch_element_spec[0]["path"] == "/spec/minReplicas"
+            assert patch_element_spec[0]["value"] == 4
