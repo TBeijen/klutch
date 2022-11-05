@@ -3,13 +3,14 @@ import logging
 import threading
 import time
 from queue import Empty
-from queue import Queue
+from queue import SimpleQueue
 from typing import List
 from typing import Optional
 
 from kubernetes import client  # type: ignore
 
 from klutch import actions
+from klutch.config import KlutchConfig
 from klutch.status import HpaStatus
 
 
@@ -17,7 +18,7 @@ class BaseThread(threading.Thread):
 
     tick_interval = 1
 
-    def __init__(self, queue: Queue, config, name_suffix="", *args, **kwargs):
+    def __init__(self, queue: SimpleQueue, config: KlutchConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.full_name = "{cls} ({thr})".format(cls=self.__class__.__name__, thr=self.name)
