@@ -58,9 +58,9 @@ def find_cm_status(config: KlutchConfig) -> List[client.models.v1_config_map.V1C
     )
 
 
-def create_cm_status(config: KlutchConfig, status: list):
+def create_cm_status(config: KlutchConfig, status_list: List[HpaStatus]) -> client.models.v1_config_map.V1ConfigMap:
     config_map = client.models.v1_config_map.V1ConfigMap(
-        data={"status": json.dumps(status)},
+        data={"status": json.dumps([s.dict() for s in status_list])},
         metadata=client.models.V1ObjectMeta(
             name=config.common.cm_status_name,
             labels={config.common.cm_status_label_key: config.common.cm_status_label_value},

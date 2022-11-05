@@ -4,8 +4,13 @@ import threading
 import time
 from queue import Empty
 from queue import Queue
+from typing import List
+from typing import Optional
+
+from kubernetes import client  # type: ignore
 
 from klutch import actions
+from klutch.status import HpaStatus
 
 
 class BaseThread(threading.Thread):
@@ -52,7 +57,7 @@ class ProcessScaler(BaseThread):
     while in midst of scale-up/down cycle.
     """
 
-    status = None
+    status_cm: Optional[client.models.v1_config_map.V1ConfigMap]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,8 +70,8 @@ class ProcessScaler(BaseThread):
         self._start_up()
         try:
             while True:
-                if self.status:
-                    if actions.is_status_duration_expired(self.status):
+                if self.status_cm:
+                    if actions.is_status_duration_expired(self.config, self.status_cm):
                         self._end_sequence()
                     else:
                         self._continue_sequence()
@@ -87,35 +92,41 @@ class ProcessScaler(BaseThread):
 
     def _start_up(self):
         """Startup: Find any scaling status ConfigMap that might exist and resume if found."""
-        statuses = actions.find_cm_status(self.config)
-        if not statuses:
+        status_cm_list = actions.find_cm_status(self.config)
+        if not status_cm_list:
             self.logger.info("Startup: No status for ongoing scaling sequence found.")
             return
-        self.status = statuses.pop(0)
+        self.status_cm = status_cm_list.pop(0)
         self.logger.info("Startup: Found status for ongoing scaling sequence. Resuming.")
-        if statuses:
+        if status_cm_list:
             self.logger.warning(
                 "Startup: Found multiple statuses for ongoing scaling sequence. Deleting all but newest."
             )
-            for s in statuses:
+            for s in status_cm_list:
                 actions.delete_cm_status(s)
 
     def _start_sequence(self):
-        """Start scaling sequence: Find HPAs, scale up an write status."""
-        self.status = []
+        """Start scaling sequence: Find HPAs, scale up and write status."""
+        status_list = []
         hpas = actions.find_hpas(self.config)
         for hpa in hpas:
             try:
                 hpa_status, patched_hpa = actions.scale_hpa(self.config, hpa, self.logger)
-                self.status.append(hpa_status)
+                status_list.append(hpa_status)
             except Exception as e:
                 self.logger.exception()
-        actions.create_cm_status(self.status)
+        self.status_cm = actions.create_cm_status(self.config, status_list)
 
     def _continue_sequence(self):
-        pass
+        """While active: Clear any additional triggers from queue, reconcile HPAs."""
+        self.logger.debug(f"Continuing scaling sequence.")
+        while not self.queue.empty():
+            ignored_payload = self.queue.get(block=False)
+            self.logger.info(f"Ignoring trigger {ignored_payload} while scaling sequence is active.")
 
     def _end_sequence(self):
+        """End sequence: Revert HPAs, clear status."""
+        self.logger.info(f"Ending scaling sequence.")
         pass
 
 

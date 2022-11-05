@@ -129,14 +129,25 @@ def test_create_cm_status(mock_client, mock_config):
     mock_config.common.cm_status_label_key = "kl-status"
     mock_config.common.cm_status_label_value = "yes"
 
-    status = [{"foo": "bar"}]
+    status_list = [
+        HpaStatus(
+            name="foo",
+            namespace="ns",
+            status=StatusData(
+                originalMinReplicas=1,
+                originalCurrentReplicas=1,
+                appliedMinReplicas=2,
+                appliedAt=int(datetime.now().timestamp()),
+            ),
+        )
+    ]
     mock_response = MagicMock()
     mock_client.CoreV1Api().create_namespaced_config_map.return_value = mock_response
 
     # Prevent models instantiated in sut to be mocks as well
     mock_client.models = client.models
 
-    resp = actions.create_cm_status(mock_config, status)
+    resp = actions.create_cm_status(mock_config, status_list)
 
     call_args = mock_client.CoreV1Api().create_namespaced_config_map.call_args_list
     assert len(call_args) == 1
@@ -144,7 +155,7 @@ def test_create_cm_status(mock_client, mock_config):
     assert type(call_args[0].args[1]) == client.models.v1_config_map.V1ConfigMap
     assert call_args[0].args[1].metadata.name == "kl-status-name"
     assert call_args[0].args[1].metadata.labels.get("kl-status") == "yes"
-    assert call_args[0].args[1].data.get("status") == json.dumps(status)
+    assert json.loads(call_args[0].args[1].data.get("status")) == [s.dict() for s in status_list]
     assert resp is mock_response
 
 

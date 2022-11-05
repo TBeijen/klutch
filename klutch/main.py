@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from argparse import ArgumentParser
-from queue import Queue
+from queue import SimpleQueue
 
 from nx_config import add_cli_options  # type: ignore
 from nx_config import fill_config_from_path  # type: ignore
@@ -101,7 +101,7 @@ def main():
     configure_kubernetes()
     logger.info(f"Initializing")
 
-    trigger_queue = Queue()
+    trigger_queue = SimpleQueue()
     threads = ThreadHandler()
     threads.add(ProcessScaler(trigger_queue, config))
     if config.trigger_web_hook.enabled:

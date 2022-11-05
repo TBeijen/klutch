@@ -12,78 +12,78 @@ from klutch.config import Config
 logger = logging.getLogger(__name__)
 
 
-def process_triggers(config: Config):
-    """Search for trigger ConfigMap and start sequence.
+# def process_triggers(config: Config):
+#     """Search for trigger ConfigMap and start sequence.
 
-    Will evaluate the trigger. If it has exceeded max age it will be removed without starting a sequence.
+#     Will evaluate the trigger. If it has exceeded max age it will be removed without starting a sequence.
 
-    Args:
-        config: Config instance
+#     Args:
+#         config: Config instance
 
-    Returns:
-        bool: Whether or not there is a sequence ongoing
-    """
-    logger.debug("Looking for trigger ConfigMap objects.")
-    trigger_cm_list = actions.find_cm_triggers(config)
+#     Returns:
+#         bool: Whether or not there is a sequence ongoing
+#     """
+#     logger.debug("Looking for trigger ConfigMap objects.")
+#     trigger_cm_list = actions.find_cm_triggers(config)
 
-    if not trigger_cm_list:
-        logger.debug("No triggers found")
-        return False
+#     if not trigger_cm_list:
+#         logger.debug("No triggers found")
+#         return False
 
-    trigger_cm = trigger_cm_list.pop(0)
-    if trigger_cm_list:
-        logger.warning("More than one trigger found. Using most recent. Removing others.")
-        for t in trigger_cm_list:
-            actions.delete_cm_trigger(t)
+#     trigger_cm = trigger_cm_list.pop(0)
+#     if trigger_cm_list:
+#         logger.warning("More than one trigger found. Using most recent. Removing others.")
+#         for t in trigger_cm_list:
+#             actions.delete_cm_trigger(t)
 
-    if not actions.validate_cm_trigger(config, trigger_cm):
-        actions.delete_cm_trigger(trigger_cm)
-        logger.warning(
-            "Trigger ConfigMap (name={}, uid={}) is not valid (expired) and has been deleted.".format(
-                trigger_cm.metadata.name,
-                trigger_cm.metadata.uid,
-            )
-        )
-        return False
+#     if not actions.validate_cm_trigger(config, trigger_cm):
+#         actions.delete_cm_trigger(trigger_cm)
+#         logger.warning(
+#             "Trigger ConfigMap (name={}, uid={}) is not valid (expired) and has been deleted.".format(
+#                 trigger_cm.metadata.name,
+#                 trigger_cm.metadata.uid,
+#             )
+#         )
+#         return False
 
-    # ==== Above is re-implemented
+#     # ==== Above is re-implemented
 
-    logger.info(
-        "Processing trigger ConfigMap (name={}, uid={})".format(
-            trigger_cm.metadata.name,
-            trigger_cm.metadata.uid,
-        )
-    )
-    status = []
-    for hpa in actions.find_hpas(config):
-        try:
-            _, patched_hpa = actions.scale_hpa(config, hpa, logger)
-            patched_hpa_status = json.loads(patched_hpa.metadata.annotations.get(config.common.hpa_annotation_status))
-            entry = {
-                "name": patched_hpa.metadata.name,
-                "namespace": patched_hpa.metadata.namespace,
-                "status": patched_hpa_status,
-            }
-            status.append(entry)
-        except Exception as e:
-            # Allow other hpas to be processed on any (un)expected error
-            logger.error(
-                "Error while scaling up HorizontalPodAutoscaler (namespace={ns}, name={name}, uid={uid}). Reason: {err}".format(
-                    ns=hpa.metadata.namespace,
-                    name=hpa.metadata.name,
-                    uid=hpa.metadata.uid,
-                    err=str(e),
-                )
-            )
-    created_status_cm = actions.create_cm_status(config, status)
-    actions.delete_cm_trigger(trigger_cm)
-    logger.info(
-        "Finished updating {} HorizontalPodAutoscalers. Status written to ConfigMap (name={}, uid={})".format(
-            len(status), created_status_cm.metadata.name, created_status_cm.metadata.uid
-        )
-    )
+#     logger.info(
+#         "Processing trigger ConfigMap (name={}, uid={})".format(
+#             trigger_cm.metadata.name,
+#             trigger_cm.metadata.uid,
+#         )
+#     )
+#     status = []
+#     for hpa in actions.find_hpas(config):
+#         try:
+#             _, patched_hpa = actions.scale_hpa(config, hpa, logger)
+#             patched_hpa_status = json.loads(patched_hpa.metadata.annotations.get(config.common.hpa_annotation_status))
+#             entry = {
+#                 "name": patched_hpa.metadata.name,
+#                 "namespace": patched_hpa.metadata.namespace,
+#                 "status": patched_hpa_status,
+#             }
+#             status.append(entry)
+#         except Exception as e:
+#             # Allow other hpas to be processed on any (un)expected error
+#             logger.error(
+#                 "Error while scaling up HorizontalPodAutoscaler (namespace={ns}, name={name}, uid={uid}). Reason: {err}".format(
+#                     ns=hpa.metadata.namespace,
+#                     name=hpa.metadata.name,
+#                     uid=hpa.metadata.uid,
+#                     err=str(e),
+#                 )
+#             )
+#     created_status_cm = actions.create_cm_status(config, status)
+#     actions.delete_cm_trigger(trigger_cm)
+#     logger.info(
+#         "Finished updating {} HorizontalPodAutoscalers. Status written to ConfigMap (name={}, uid={})".format(
+#             len(status), created_status_cm.metadata.name, created_status_cm.metadata.uid
+#         )
+#     )
 
-    return True
+#     return True
 
 
 def process_ongoing(config: Config):
