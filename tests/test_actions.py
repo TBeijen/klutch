@@ -10,6 +10,8 @@ from kubernetes import client
 
 from klutch import actions
 from klutch.config import config as klutch_config
+from klutch.status import HpaStatus
+from klutch.status import StatusData
 
 REFERENCE_TS = 1500000000
 
@@ -209,9 +211,6 @@ def test_find_hpas(mock_client, mock_config, annotation_key, annotation_value, s
     assert (mock_hpa2 in found) is should_be_included
 
 
-# ==== Above is re-implemented
-
-
 @pytest.mark.parametrize(
     "hpa_min_r, hpa_max_r, hpa_current_r, hpa_scale_perc, expected_min_r, expect_log, expected_exception",
     [
@@ -251,29 +250,29 @@ def test_scale_hpa_patches(
     mock_patched_hpa = get_mock_hpa()
     mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.return_value = mock_patched_hpa
 
+    expected_hpa_status = HpaStatus(
+        name="test-hpa",
+        namespace="test-ns",
+        status=StatusData(
+            originalMinReplicas=hpa_min_r,
+            originalCurrentReplicas=hpa_current_r,
+            appliedMinReplicas=expected_min_r,
+            appliedAt=REFERENCE_TS,
+        ),
+    )
+
+    expected_patch_body = {
+        "metadata": {"annotations": {"kl-status": json.dumps(expected_hpa_status.dict().get("status"))}},
+        "spec": {"minReplicas": expected_min_r},
+    }
+
     with expected_exception:
-
-        expected_patch_body = {
-            "metadata": {
-                "annotations": {
-                    "kl-status": json.dumps(
-                        {
-                            "originalMinReplicas": hpa_min_r,
-                            "originalCurrentReplicas": hpa_current_r,
-                            "appliedMinReplicas": expected_min_r,
-                            "appliedAt": REFERENCE_TS,
-                        }
-                    )
-                }
-            },
-            "spec": {"minReplicas": expected_min_r},
-        }
-
         returned_status, returned_hpa = actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
 
         mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
             "test-hpa", "test-ns", expected_patch_body
         )
+        assert returned_status == expected_hpa_status
         assert returned_hpa is mock_patched_hpa
 
 
@@ -286,6 +285,9 @@ def test_scale_hpa_raises_if_annotation_found(mock_client, mock_config):
 
     with pytest.raises(ValueError):
         actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
+
+
+# ==== Above is re-implemented
 
 
 @pytest.mark.parametrize(
