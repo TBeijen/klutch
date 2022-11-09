@@ -31,8 +31,14 @@ class HpaStatus:
     def dict(self) -> Dict:
         return asdict(self)
 
-    def json(self) -> str:
-        return json.dumps(self.dict())
+
+@dataclass
+class SequenceStatus:
+
+    """Representation of ongoing scaling sequence."""
+
+    started_at_ts: int
+    status_list: List[HpaStatus]
 
 
 def create_hpa_status(
@@ -50,6 +56,17 @@ def create_hpa_status(
     )
 
 
+def sequence_status_from_cm(status_cm: client.models.v1_config_map.V1ConfigMap) -> SequenceStatus:
+    cm_ts = status_cm.metadata.creation_timestamp.timestamp()
+    hpa_status_list = []
+    for s in json.loads(status_cm.data.get("status")):
+        hpa_status_list.append(
+            HpaStatus(name=s.get("name"), namespace=s.get("namespace"), status=StatusData(**s.get("status")))
+        )
+    return SequenceStatus(started_at_ts=cm_ts, status_list=hpa_status_list)
+
+
+# deprecated?
 def status_list_from_dict(status_data: Dict) -> List[HpaStatus]:
     hpa_status_list = []
     for s in status_data:

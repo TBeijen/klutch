@@ -3,6 +3,7 @@ import signal
 import sys
 import threading
 import time
+import traceback
 from argparse import ArgumentParser
 from queue import SimpleQueue
 
@@ -78,6 +79,25 @@ class ThreadHandler:
 
         def hook(args: threading.ExceptHookArgs):
             print(args)
+
+            msg = "Caught exception in Thread: {thread}\n{info}".format(
+                thread=args.thread,
+                info="".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)),
+            )
+            _self.logger.error(msg)
+            # msg = "{type}\n{value}\nThread: {thread}\n{stack}".format(
+            #     type = args.exc_type,
+            #     value = args.exc_value,
+            #     thread = args.thread,
+            #     stack = args.exc_traceback.format_exception(),
+            # )
+            # self.logger.error(msg)
+            #     args.exc_value,
+            #     thread = args.thread,
+            #     exc_type = args.exc_type,
+            #     exc_traceback = args.exc_traceback
+            # )
+            # self.logger.error(exc_type=args.exc_type, exc_info=args.exc)
             _self._stop_program()
 
         threading.excepthook = hook
@@ -102,10 +122,11 @@ def main():
     logger.info(f"Initializing")
 
     trigger_queue = SimpleQueue()
+    is_active_event = threading.Event()
     threads = ThreadHandler()
-    threads.add(ProcessScaler(trigger_queue, config))
+    threads.add(ProcessScaler(trigger_queue, is_active_event, config))
     if config.trigger_web_hook.enabled:
-        threads.add(TriggerWebHook(trigger_queue, config))
+        threads.add(TriggerWebHook(trigger_queue, is_active_event, config))
     if config.trigger_config_map.enabled:
-        threads.add(TriggerConfigMap(trigger_queue, config))
+        threads.add(TriggerConfigMap(trigger_queue, is_active_event, config))
     threads.start_all()

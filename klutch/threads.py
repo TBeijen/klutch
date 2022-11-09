@@ -12,18 +12,21 @@ from kubernetes import client  # type: ignore
 from klutch import actions
 from klutch.config import KlutchConfig
 from klutch.status import HpaStatus
+from klutch.status import sequence_status_from_cm
+from klutch.status import SequenceStatus
 
 
 class BaseThread(threading.Thread):
 
     tick_interval = 1
 
-    def __init__(self, queue: SimpleQueue, config: KlutchConfig, *args, **kwargs):
+    def __init__(self, queue: SimpleQueue, is_active_event: threading.Event, config: KlutchConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.full_name = "{cls} ({thr})".format(cls=self.__class__.__name__, thr=self.name)
         self.should_stop = False
         self.queue = queue
+        self.is_active_event = is_active_event
         self.config = config
         self.logger = logging.getLogger(self.full_name)
         self.logger.info(f"Started")
@@ -43,9 +46,13 @@ class BaseThread(threading.Thread):
         self.logger.info("Received stop")
         self.should_stop = True
 
-    def trigger(self):
+    def _trigger(self):
         self.logger.info("Triggering")
         self.queue.put(self.full_name)
+
+    def _is_active(self) -> bool:
+        """Return True if a scaling sequence is active."""
+        return self.is_active_event.is_set()
 
 
 class ProcessScaler(BaseThread):
@@ -60,10 +67,11 @@ class ProcessScaler(BaseThread):
 
     status_cm: Optional[client.models.v1_config_map.V1ConfigMap]
 
+    sequence_status: Optional[SequenceStatus]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.queue_wait = 5
-        self.is_active = False
         self.scale_duration = self.config.common.duration
         self.reconcile_interval = self.config.common.reconcile_interval
 
@@ -71,7 +79,7 @@ class ProcessScaler(BaseThread):
         self._start_up()
         try:
             while True:
-                if self.status_cm:
+                if self._is_active():
                     if actions.is_status_duration_expired(self.config, self.status_cm):
                         self._end_sequence()
                     else:
@@ -97,8 +105,13 @@ class ProcessScaler(BaseThread):
         if not status_cm_list:
             self.logger.info("Startup: No status for ongoing scaling sequence found.")
             return
-        self.status_cm = status_cm_list.pop(0)
+        status_cm = status_cm_list.pop(0)
+
+        # Store retrieved status
+        self._set_active(sequence_status_from_cm(status_cm))
         self.logger.info("Startup: Found status for ongoing scaling sequence. Resuming.")
+
+        # cleanup excess statuses (should not happen)
         if status_cm_list:
             self.logger.warning(
                 "Startup: Found multiple statuses for ongoing scaling sequence. Deleting all but newest."
@@ -116,19 +129,34 @@ class ProcessScaler(BaseThread):
                 status_list.append(hpa_status)
             except Exception as e:
                 self.logger.exception()
-        self.status_cm = actions.create_cm_status(self.config, status_list)
+        status_cm = actions.create_cm_status(self.config, status_list)
+        self._set_active(sequence_status_from_cm(status_cm))
 
     def _continue_sequence(self):
         """While active: Clear any additional triggers from queue, reconcile HPAs."""
         self.logger.debug(f"Continuing scaling sequence.")
-        while not self.queue.empty():
-            ignored_payload = self.queue.get(block=False)
-            self.logger.info(f"Ignoring trigger {ignored_payload} while scaling sequence is active.")
+        self._clear_all_triggers()
 
     def _end_sequence(self):
         """End sequence: Revert HPAs, clear status."""
         self.logger.info(f"Ending scaling sequence.")
         pass
+
+    def _clear_all_triggers(self):
+        """Clear any triggers added to the queue."""
+        while not self.queue.empty():
+            ignored_payload = self.queue.get(block=False)
+            self.logger.info(f"Ignoring trigger {ignored_payload} while scaling sequence is active.")
+
+    def _set_active(self, sequence_status: SequenceStatus):
+        """Set global active flag and store HpaStatus list."""
+        self.is_active_event.set()
+        self.sequence_status = sequence_status
+
+    def _set_inactive(self, status_list: List[HpaStatus]):
+        """Clear global active flag and clear HpaStatus list."""
+        self.is_active_event.clear()
+        self.sequence_status = None
 
 
 class TriggerConfigMap(BaseThread):
@@ -150,7 +178,7 @@ class TriggerConfigMap(BaseThread):
                     trigger_cm = trigger_cm_list.pop(0)
                     # validate
                     if actions.validate_cm_trigger(self.config, trigger_cm):
-                        self.trigger()
+                        self._trigger()
                     else:
                         self.logger.warning(
                             "Trigger ConfigMap (name={}, uid={}) is not valid (expired) and has been deleted.".format(
@@ -176,7 +204,7 @@ class TriggerWebHook(BaseThread):
     def run(self):
         _queue = self.queue
         _logger = self.logger
-        _trigger = self.trigger
+        _trigger = self._trigger
 
         class Handler(http.server.BaseHTTPRequestHandler):
             queue = _queue

@@ -63,12 +63,12 @@ repos:
           - "45114"
         # stages: [push]
 
-      # - id: pytest
-      #   name: pytest
-      #   description: Runs pytest
-      #   entry: poetry run pytest
-      #   language: system
-      #   pass_filenames: false
+      - id: pytest
+        name: pytest
+        description: Runs pytest
+        entry: poetry run pytest
+        language: system
+        pass_filenames: false
 
       - id: mypy
         name: mypy
