@@ -69,14 +69,6 @@ def create_cm_status(config: KlutchConfig, status_list: List[HpaStatus]) -> clie
     return client.CoreV1Api().create_namespaced_config_map(config.common.namespace, config_map)
 
 
-# deprecated
-def is_status_duration_expired(config: KlutchConfig, status: client.models.v1_config_map.V1ConfigMap) -> bool:
-    """Return True if duration of scaling sequence has expired."""
-    cm_ts = status.metadata.creation_timestamp.timestamp()
-    now = datetime.now().timestamp()
-    return cm_ts + config.common.duration < now
-
-
 def delete_cm_status(status: client.models.v1_config_map.V1ConfigMap):
     return client.CoreV1Api().delete_namespaced_config_map(status.metadata.name, status.metadata.namespace)
 

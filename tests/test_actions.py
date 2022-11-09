@@ -1,36 +1,15 @@
 import json
-import logging
 from contextlib import ExitStack as does_not_raise
 from datetime import datetime
 from unittest.mock import MagicMock
-from unittest.mock import Mock
 
 import pytest
 from kubernetes import client
 
+from .conftest import REFERENCE_TS
 from klutch import actions
-from klutch.config import config as klutch_config
 from klutch.status import HpaStatus
 from klutch.status import StatusData
-
-REFERENCE_TS = 1500000000
-
-
-dummy_logger = logging.Logger("test dummy")
-
-
-@pytest.fixture
-def mock_client(monkeypatch):
-    mock_client = MagicMock(spec=client)
-    monkeypatch.setattr("klutch.actions.client", mock_client)
-    return mock_client
-
-
-@pytest.fixture
-def mock_config():
-    mock_config = Mock(klutch_config)
-    mock_config.common.namespace = "test-ns"
-    return mock_config
 
 
 def get_mock_hpa(name="test-hpa", namespace="test-ns", min_repl=2, max_repl=10, current_repl=4, annotations=None):
@@ -81,8 +60,7 @@ def test_find_cm_triggers(mock_client, mock_config):
         ),  # 'future' configmaps should be no problem
     ],
 )
-def test_validate_cm_trigger(freezer, creation_timestamp, trigger_max_age, expected, mock_config):
-    freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
+def test_validate_cm_trigger(frozen, creation_timestamp, trigger_max_age, expected, mock_config):
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.creation_timestamp = creation_timestamp
 
@@ -159,28 +137,6 @@ def test_create_cm_status(mock_client, mock_config):
     assert resp is mock_response
 
 
-@pytest.mark.parametrize(
-    "creation_timestamp, duration, expected",
-    [
-        (datetime.fromtimestamp(REFERENCE_TS), 300, False),
-        (datetime.fromtimestamp(REFERENCE_TS - 300), 300, False),
-        (datetime.fromtimestamp(REFERENCE_TS - 301), 300, True),
-        (
-            datetime.fromtimestamp(REFERENCE_TS + 100),
-            300,
-            False,
-        ),  # 'future' configmaps should be no problem
-    ],
-)
-def test_is_status_duration_expired(freezer, creation_timestamp, duration, expected, mock_config):
-    freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
-    mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
-    mock_cm.metadata.creation_timestamp = creation_timestamp
-    mock_config.common.duration = duration
-
-    assert actions.is_status_duration_expired(mock_config, mock_cm) == expected
-
-
 def test_delete_cm_status(mock_client):
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.name = "foo-name"
@@ -234,9 +190,10 @@ def test_find_hpas(mock_client, mock_config, annotation_key, annotation_value, s
     ],
 )
 def test_scale_hpa_patches(
-    freezer,
+    frozen,
     mock_client,
     mock_config,
+    logger,
     hpa_min_r,
     hpa_max_r,
     hpa_current_r,
@@ -245,7 +202,6 @@ def test_scale_hpa_patches(
     expect_log,
     expected_exception,
 ):
-    freezer.move_to(datetime.fromtimestamp(REFERENCE_TS))
     # Setting custom annotation key to test if config is used
     mock_config.common.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
     mock_config.common.hpa_annotation_status = "kl-status"
@@ -278,7 +234,7 @@ def test_scale_hpa_patches(
     }
 
     with expected_exception:
-        returned_status, returned_hpa = actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
+        returned_status, returned_hpa = actions.scale_hpa(mock_config, mock_original_hpa, logger)
 
         mock_client.AutoscalingV1Api().patch_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
             "test-hpa", "test-ns", expected_patch_body
@@ -287,7 +243,7 @@ def test_scale_hpa_patches(
         assert returned_hpa is mock_patched_hpa
 
 
-def test_scale_hpa_raises_if_annotation_found(mock_client, mock_config):
+def test_scale_hpa_raises_if_annotation_found(mock_client, mock_config, logger):
     # Setting custom annotation key to test if config is used
     mock_config.common.hpa_annotation_scale_perc_of_actual = "kl-scale-to"
     mock_config.common.hpa_annotation_status = "kl-status"
@@ -295,11 +251,11 @@ def test_scale_hpa_raises_if_annotation_found(mock_client, mock_config):
     mock_original_hpa = get_mock_hpa(annotations={"kl-status": "some-json", "kl-scale-to": "200"})
 
     with pytest.raises(ValueError):
-        actions.scale_hpa(mock_config, mock_original_hpa, dummy_logger)
+        actions.scale_hpa(mock_config, mock_original_hpa, logger)
 
 
 @pytest.mark.parametrize("has_patch_annotation", [True, False])
-def test_revert_hpa_patches(mock_client, mock_config, has_patch_annotation):
+def test_revert_hpa_patches(mock_client, mock_config, logger, has_patch_annotation):
     mock_config.common.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
 
     hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
@@ -318,7 +274,7 @@ def test_revert_hpa_patches(mock_client, mock_config, has_patch_annotation):
             appliedAt=REFERENCE_TS,
         ),
     )
-    ret_value = actions.revert_hpa(mock_config, hpa_status, dummy_logger)
+    ret_value = actions.revert_hpa(mock_config, hpa_status, logger)
 
     # should have loaded hpa using name and ns
     mock_client.AutoscalingV1Api().read_namespaced_horizontal_pod_autoscaler.assert_called_once_with(
@@ -346,7 +302,9 @@ def test_revert_hpa_patches(mock_client, mock_config, has_patch_annotation):
         (False, 6, True),  # Also reconcile if for some odd reason minReplicas is higher than appliedMinReplicas
     ],
 )
-def test_reconcile_hpa_patches(mock_client, mock_config, has_patch_annotation, hpa_min_replicas, should_patch):
+def test_reconcile_hpa_patches(
+    mock_client, mock_config, logger, has_patch_annotation, hpa_min_replicas, should_patch
+):
     mock_config.common.hpa_annotation_status = "kl/status"  # testing replacing of / by ~1
 
     hpa_annot = {"kl/status": "some-json"} if has_patch_annotation else None
@@ -365,7 +323,7 @@ def test_reconcile_hpa_patches(mock_client, mock_config, has_patch_annotation, h
             appliedAt=REFERENCE_TS,
         ),
     )
-    ret_value = actions.reconcile_hpa(mock_config, hpa_status, dummy_logger)
+    ret_value = actions.reconcile_hpa(mock_config, hpa_status, logger)
 
     patch_annot = {"op": "add", "path": "/metadata/annotations/kl~1status", "value": '{"appliedMinReplicas": 4}'}
     patch_spec = {"op": "replace", "path": "/spec/minReplicas", "value": 4}

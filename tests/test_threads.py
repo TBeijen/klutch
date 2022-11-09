@@ -1,25 +1,22 @@
 import logging
 import threading
 import time
+from datetime import datetime
 from queue import Empty
 from queue import SimpleQueue
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from kubernetes import client
 
+from .conftest import REFERENCE_TS
 from klutch.config import config as klutch_config
+from klutch.status import SequenceStatus
 from klutch.threads import BaseThread
 from klutch.threads import ProcessScaler
 from klutch.threads import TriggerConfigMap
 from klutch.threads import TriggerWebHook
-
-
-@pytest.fixture
-def mock_config():
-    mock_config = Mock(klutch_config)
-    mock_config.common.namespace = "test-ns"
-    return mock_config
 
 
 thread_classes = [
@@ -61,3 +58,27 @@ class TestBaseThread:
         assert not thread.should_stop
         thread.stop()
         assert thread.should_stop
+
+
+class TestProcessScaler:
+    @pytest.mark.parametrize(
+        "creation_timestamp, duration, expected",
+        [
+            (datetime.fromtimestamp(REFERENCE_TS), 300, False),
+            (datetime.fromtimestamp(REFERENCE_TS - 300), 300, False),
+            (datetime.fromtimestamp(REFERENCE_TS - 301), 300, True),
+            (
+                datetime.fromtimestamp(REFERENCE_TS + 100),
+                300,
+                False,
+            ),  # 'future' configmaps should be no problem
+        ],
+    )
+    def test_is_status_duration_expired(self, frozen, creation_timestamp, duration, expected, mock_config):
+        mock_config.common.duration = duration
+
+        sequence_status = SequenceStatus(creation_timestamp.timestamp(), [])
+        thread = ProcessScaler(SimpleQueue(), threading.Event(), mock_config)
+        thread.sequence_status = sequence_status
+
+        assert thread._is_status_duration_expired() == expected

@@ -2,6 +2,7 @@ import http.server
 import logging
 import threading
 import time
+from datetime import datetime
 from queue import Empty
 from queue import SimpleQueue
 from typing import List
@@ -80,7 +81,7 @@ class ProcessScaler(BaseThread):
         try:
             while True:
                 if self._is_active():
-                    if actions.is_status_duration_expired(self.config, self.status_cm):
+                    if self._is_status_duration_expired():
                         self._end_sequence()
                     else:
                         self._continue_sequence()
@@ -135,12 +136,21 @@ class ProcessScaler(BaseThread):
     def _continue_sequence(self):
         """While active: Clear any additional triggers from queue, reconcile HPAs."""
         self.logger.debug(f"Continuing scaling sequence.")
+        for status in self.sequence_status.status_list:
+            actions.reconcile_hpa(status)
         self._clear_all_triggers()
 
     def _end_sequence(self):
         """End sequence: Revert HPAs, clear status."""
         self.logger.info(f"Ending scaling sequence.")
         pass
+
+    def _is_status_duration_expired(self) -> bool:
+        """Return True if duration of scaling sequence has expired."""
+        if not self.sequence_status:
+            return False
+        now = datetime.now().timestamp()
+        return self.sequence_status.started_at_ts + self.config.common.duration < now
 
     def _clear_all_triggers(self):
         """Clear any triggers added to the queue."""
@@ -153,7 +163,7 @@ class ProcessScaler(BaseThread):
         self.is_active_event.set()
         self.sequence_status = sequence_status
 
-    def _set_inactive(self, status_list: List[HpaStatus]):
+    def _set_inactive(self):
         """Clear global active flag and clear HpaStatus list."""
         self.is_active_event.clear()
         self.sequence_status = None
