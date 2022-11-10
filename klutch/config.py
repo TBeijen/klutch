@@ -1,80 +1,106 @@
-import argparse
 import logging
 import os
+from datetime import timedelta
+from typing import Optional
 
-from kubernetes import config
+from kubernetes import config as kubernetes_config  # type: ignore
+from nx_config import Config  # type: ignore
+from nx_config import ConfigSection  # type: ignore
+from nx_config import validate  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 
-class Config:
+class CommonSectionMixin:
 
-    debug = False
-    interval = 5  # seconds
-    duration = 300  # seconds
-    trigger_max_age = 300  # seconds
-    orphan_scan_interval = 600  # seconds
-    namespace = None
+    """
+    nx_config is quite restrictive in what attributes it allows to be set (None).
 
-    cm_trigger_label_key = "klutch.it/trigger"
-    cm_trigger_label_value = "1"
-    cm_status_name = "klutch-status"
-    cm_status_label_key = "klutch.it/status"
-    cm_status_label_value = "1"
-    hpa_annotation_enabled = "klutch.it/enabled"
-    hpa_annotation_status = "klutch.it/status"
-    hpa_annotation_scale_perc_of_actual = "klutch.it/scale-percentage-of-actual"
+    This mixin provides an attribute, not part of config, that can be used to store found in-cluster namespace.
+    """
 
-    def __init__(self, args):
-        self.debug = args.debug
-        if args.interval:
-            self.interval = int(args.interval)
-        if args.duration:
-            self.duration = int(args.duration)
-        if args.trigger_max_age:
-            self.trigger_max_age = int(args.trigger_max_age)
-        if args.namespace:
-            self.namespace = args.namespace
-        else:
-            self.namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
+    _in_cluster_namespace: str = ""
+    klutch_namespace: str = ""
+
+    @property
+    def namespace(self) -> str:
+        return self.klutch_namespace or self._in_cluster_namespace
 
 
-def _get_args(args):
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--debug", help="Debug mode", action="store_true",
-    )
-    parser.add_argument(
-        "--namespace",
-        help="Namespace to look for triggers and store status in. By default will use the namespace klutch is deployed in. (Required when running out of cluster)",
-    )
-    parser.add_argument(
-        "--interval",
-        help="How frequent to scan for new triggers or ongoing scaling sequences. Default = 5 (seconds).",
-    )
-    parser.add_argument(
-        "--duration",
-        help="After this period, HorizontalPodAutoscalers will be restored to their original settings. Default= 300 (seconds).",
-    )
-    parser.add_argument(
-        "--trigger-max-age", help="Triggers older than this period will be ignored. Default= 300 (seconds).",
-    )
-    return parser.parse_args(args)
+class CommonSection(CommonSectionMixin, ConfigSection):
+    debug: bool = False
+    # Period (seconds) after which to restore original values
+    duration: int = 300
+    # Interval (seconds) used to reconcile hpa status or end scaling sequence
+    reconcile_interval: int = 10
+    # Interval (seconds) used to scan for orphans
+    scan_orphans_interval: int = 600
+    # Only needed when running out-of-cluster
+    klutch_namespace: str = ""
+
+    # Should not typically need changing: Annotation names used to configure klutch to act on HPAs
+    hpa_annotation_enabled_key: str = "klutch.it/enabled"
+    hpa_annotation_enabled_value: str = "1"
+    hpa_annotation_scale_perc_of_actual: str = "klutch.it/scale-percentage-of-actual"
+
+    # Should not typically need changing: Annotation name used to store state data while scaling is in progress
+    hpa_annotation_status: str = "klutch.it/status"
+
+    # Should not typically need changing: Name and label of configmap klutch uses to store status of ongoing scaling in
+    cm_status_name: str = "klutch-status"
+    cm_status_label_key: str = "klutch.it/status"
+    cm_status_label_value: str = "1"
+
+    @validate
+    def validate_reconcile_interval(self):
+        if self.reconcile_interval > self.duration:
+            raise ValueError("reconconcile_interval cannot be larger than duration")
+        print(self._in_cluster_namespace)
+
+    @validate
+    def validate_klutch_namespace(self):
+        try:
+            self._in_cluster_namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
+        except FileNotFoundError:
+            self._in_cluster_namespace = None
+        if not self._in_cluster_namespace and not self.klutch_namespace:
+            raise ValueError("When running out of cluster, klutch_namespace needs to be set")
 
 
-def get_config(args=None):
-    """Return config object, reflecting defaults and optional cli args."""
-    return Config(_get_args(args))
+class TriggerWebHookSection(ConfigSection):
+    enabled: bool = True
+    address: str = "127.0.0.1"
+    port: int = 8123
+
+
+class TriggerConfigMapSection(ConfigSection):
+    enabled: bool = True
+    # Interval (seconds) used to scan for trigger configmap
+    scan_interval: int = 10
+    # Max age (seconds) of configmap trigger before it's ignored and cleaned up
+    max_age: int = 240
+    # Should not typically need changing: Name and label of configmap that can be added as trigger
+    cm_trigger_label_key: str = "klutch.it/trigger"
+    cm_trigger_label_value: str = "1"
+
+
+class KlutchConfig(Config):
+    common: CommonSection
+    trigger_web_hook: TriggerWebHookSection
+    trigger_config_map: TriggerConfigMapSection
+
+
+config = KlutchConfig()
 
 
 def configure_kubernetes():
     """Configure kubernetes client."""
     try:
-        config.load_incluster_config()
-        logger.debug("Configured kube_client from ServiceAccount")
-    except config.ConfigException:
+        kubernetes_config.load_incluster_config()
+        logger.info("Configured kube_client from ServiceAccount")
+    except kubernetes_config.ConfigException:
         # Kubernetes SDK evaluates KUBECONFIG, however does so directly in module,
         # which is evaluated on directly on import, making it hard to mock.
         # For that reason evaluating here and passing in via config_file.
-        config.load_kube_config(config_file=os.environ.get("KUBECONFIG"))
-        logger.debug("Configured kube_client from config file")
+        kubernetes_config.load_kube_config(config_file=os.environ.get("KUBECONFIG"))
+        logger.info("Configured kube_client from config file")

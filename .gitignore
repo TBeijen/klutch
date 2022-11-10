@@ -5,3 +5,6 @@ __pycache__
 .vscode
 .mypy_cache/
 .temp/
+
+# Any development config file
+/*.yaml

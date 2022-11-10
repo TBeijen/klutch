@@ -56,7 +56,7 @@ python -m klutch --dry-run
             "type": "python",
             "request": "launch",
             "module": "klutch",
-            "args" : ["--dry-run"]
+            "args" : ["--config-path=dev.yaml"]
         }
     ]
 }
@@ -66,7 +66,13 @@ python -m klutch --dry-run
 
 ```json
 {
-    "python.pythonPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.8"
+    "python.defaultInterpreterPath": "/Users/<user-name>/Library/Caches/pypoetry/virtualenvs/klutch-abcabc-py3.9",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true
 }
 ```
 

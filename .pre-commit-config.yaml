@@ -16,7 +16,7 @@ repos:
       - id: reorder-python-imports
 
   - repo: https://github.com/ambv/black
-    rev: 19.10b0
+    rev: 22.3.0
     hooks:
       - id: black
 
@@ -95,8 +95,8 @@ repos:
       - id: check-docstring-first
       - id: debug-statements
       - id: end-of-file-fixer
-      - id: flake8
-        additional_dependencies: ["flake8-bugbear"]
+      # - id: flake8
+      #   additional_dependencies: ["flake8-bugbear"]
       - id: trailing-whitespace
       - id: check-ast
       - id: check-builtin-literals

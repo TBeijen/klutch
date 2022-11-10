@@ -9,6 +9,7 @@ license = "Apache-2.0"
 python = "~3.9.0"
 jmespath = "~0.9.5"
 kubernetes = "^24.0.0"
+nx-config = "^0.2.0b5"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.2.0"
@@ -17,6 +18,12 @@ pytest = "^5.4.1"
 pyfakefs = "^4.0.2"
 pytest-freezegun = "^0.4.2"
 mypy = "^0.982"
+
+[tool.pytest.ini_options]
+# TODO: figure out why pytest ignores this
+filterwarnings = [
+    "ignore:.*:DeprecationWarning",
+]
 
 [tool.black]
 line-length = 118
