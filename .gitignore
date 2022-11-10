@@ -2,6 +2,7 @@ __pycache__
 *.pyc
 *.bak
 *.egg*
+*.code-workspace
 .vscode
 .mypy_cache/
 .temp/
