@@ -137,12 +137,16 @@ def test_create_cm_status(mock_client, mock_config):
     assert resp is mock_response
 
 
-def test_delete_cm_status(mock_client):
+def test_delete_cm_status(mock_client, mock_config, logger):
     mock_cm = MagicMock(spec=client.models.v1_config_map.V1ConfigMap)
     mock_cm.metadata.name = "foo-name"
     mock_cm.metadata.namespace = "bar-ns"
 
-    actions.delete_cm_status(mock_cm)
+    mock_cm_list = MagicMock()
+    mock_cm_list.items = [mock_cm]
+    mock_client.CoreV1Api().list_namespaced_config_map.return_value = mock_cm_list
+
+    actions.delete_cm_status(mock_config, logger)
 
     mock_client.CoreV1Api().delete_namespaced_config_map.assert_called_once_with("foo-name", "bar-ns")
 

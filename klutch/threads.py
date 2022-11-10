@@ -137,13 +137,16 @@ class ProcessScaler(BaseThread):
         """While active: Clear any additional triggers from queue, reconcile HPAs."""
         self.logger.debug(f"Continuing scaling sequence.")
         for status in self.sequence_status.status_list:
-            actions.reconcile_hpa(status)
+            actions.reconcile_hpa(self.config, status, self.logger)
         self._clear_all_triggers()
 
     def _end_sequence(self):
         """End sequence: Revert HPAs, clear status."""
         self.logger.info(f"Ending scaling sequence.")
-        pass
+        for status in self.sequence_status.status_list:
+            actions.revert_hpa(self.config, status, self.logger)
+        self._clear_all_triggers()
+        self._set_inactive()
 
     def _is_status_duration_expired(self) -> bool:
         """Return True if duration of scaling sequence has expired."""
@@ -166,6 +169,7 @@ class ProcessScaler(BaseThread):
     def _set_inactive(self):
         """Clear global active flag and clear HpaStatus list."""
         self.is_active_event.clear()
+        actions.delete_cm_status(self.config, self.logger)
         self.sequence_status = None
 
 

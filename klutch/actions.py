@@ -69,8 +69,14 @@ def create_cm_status(config: KlutchConfig, status_list: List[HpaStatus]) -> clie
     return client.CoreV1Api().create_namespaced_config_map(config.common.namespace, config_map)
 
 
-def delete_cm_status(status: client.models.v1_config_map.V1ConfigMap):
-    return client.CoreV1Api().delete_namespaced_config_map(status.metadata.name, status.metadata.namespace)
+def delete_cm_status(config: KlutchConfig, logger: logging.Logger):
+    """Delete any ConfigMap labeled as status."""
+    status_cm_list = find_cm_status(config)
+    for cm in status_cm_list:
+        try:
+            client.CoreV1Api().delete_namespaced_config_map(cm.metadata.name, cm.metadata.namespace)
+        except client.exceptions.ApiException:
+            logger.exception("Error deleting status ConfigMap")
 
 
 def find_hpas(

@@ -26,10 +26,10 @@ spec:
             protocol: TCP
         resources:
           limits:
-            cpu: 400m
+            cpu: 300m
             memory: 100Mi
           requests:
-            cpu: 300m
+            cpu: 200m
             memory: 10Mi
 
 ---
@@ -38,7 +38,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   annotations:
     klutch.it/enabled: "1"
-    klutch.it/scale-percentage-of-actual: "1000"
+    klutch.it/scale-percentage-of-actual: "400"
   name: klutch-example-app
 spec:
   maxReplicas: 10
@@ -87,4 +87,4 @@ spec:
       - image: curlimages/curl:7.71.0
         imagePullPolicy: IfNotPresent
         name: generator
-        args: ["sh", "-c", "while true; do curl http://klutch-example-app:8080/ConsumeCPU -s --data \"millicores=200&durationSec=120\" && sleep 125s; done"]
+        args: ["sh", "-c", "while true; do curl http://klutch-example-app:8080/ConsumeCPU -s --data \"millicores=100&durationSec=120\" && sleep 125s; done"]
