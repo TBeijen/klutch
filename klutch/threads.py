@@ -12,7 +12,7 @@ from kubernetes import client  # type: ignore
 
 from klutch import actions
 from klutch.config import KlutchConfig
-from klutch.status import HpaStatus
+from klutch.status import hpa_status_from_annotated_hpa
 from klutch.status import sequence_status_from_cm
 from klutch.status import SequenceStatus
 
@@ -130,8 +130,8 @@ class ProcessScaler(BaseThread):
                 status_list.append(hpa_status)
             except Exception as e:
                 self.logger.exception()
-        status_cm = actions.create_cm_status(self.config, status_list)
         self._set_active(sequence_status_from_cm(status_cm))
+        status_cm = actions.create_cm_status(self.config, status_list)
 
     def _continue_sequence(self):
         """While active: Clear any additional triggers from queue, reconcile HPAs."""
@@ -259,3 +259,39 @@ class TriggerWebHook(BaseThread):
                 time.sleep(self.tick_interval)
         finally:
             self.logger.info("Stopped")
+
+
+class ProcessOrphans(BaseThread):
+
+    """
+    Periodically check for orphans.
+
+    While scaling sequence is active, check for HPAs having annotation indicating they
+    are scaled up and revert them to their original state.
+    """
+
+    def run(self):
+        elapsed = 0
+        tick = 3
+
+        while True:
+            if self.should_stop:
+                self.logger.info("Stopping")
+                return
+            if self._is_active():
+                elapsed = 0
+            else:
+                elapsed += tick
+                if elapsed >= self.config.common.scan_orphans_interval:
+                    self.logger.info("Searching for orphan HorizontalPodAutoscalers that need to be reverted.")
+                    hpas = actions.find_hpas(self.config)
+                    for hpa in hpas:
+                        if self.config.common.hpa_annotation_status in hpa.metadata.annotations:
+                            self.logger.warning(
+                                "Found {} having status annotation, reverting.".format(actions._hpa_repr(hpa))
+                            )
+                            # @TODO Needs error handling if annotation data not complete
+                            actions.revert_hpa(
+                                self.config, hpa_status_from_annotated_hpa(self.config, hpa), self.logger
+                            )
+            time.sleep(tick)

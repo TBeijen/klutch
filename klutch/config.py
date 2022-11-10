@@ -34,7 +34,7 @@ class CommonSection(CommonSectionMixin, ConfigSection):
     # Interval (seconds) used to reconcile hpa status or end scaling sequence
     reconcile_interval: int = 10
     # Interval (seconds) used to scan for orphans
-    scan_orphans_duration: int = 600
+    scan_orphans_interval: int = 600
     # Only needed when running out-of-cluster
     klutch_namespace: str = ""
 

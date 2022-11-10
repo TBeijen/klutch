@@ -7,6 +7,8 @@ from typing import List
 
 from kubernetes import client  # type: ignore
 
+from klutch.config import KlutchConfig
+
 
 @dataclass
 class StatusData:
@@ -66,11 +68,12 @@ def sequence_status_from_cm(status_cm: client.models.v1_config_map.V1ConfigMap) 
     return SequenceStatus(started_at_ts=cm_ts, status_list=hpa_status_list)
 
 
-# deprecated?
-def status_list_from_dict(status_data: Dict) -> List[HpaStatus]:
-    hpa_status_list = []
-    for s in status_data:
-        hpa_status_list.append(
-            HpaStatus(name=s.get("name"), namespace=s.get("namespace"), status=StatusData(**s.get("status")))
-        )
-    return hpa_status_list
+def hpa_status_from_annotated_hpa(
+    config: KlutchConfig, hpa: client.models.v1_horizontal_pod_autoscaler.V1HorizontalPodAutoscaler
+) -> HpaStatus:
+    data = json.loads(hpa.metadata.annotations.get(config.common.hpa_annotation_status))
+    return HpaStatus(
+        name=hpa.metadata.name,
+        namespace=hpa.metadata.namespace,
+        status=StatusData(**data),
+    )
