@@ -14,7 +14,7 @@ FROM python:3.9-slim
 
 WORKDIR /
 
-COPY --from=0 /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=0 /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 
 COPY klutch /klutch
 
