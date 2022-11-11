@@ -75,5 +75,5 @@ jobs:
         with:
           push: false
           tags: tbeijen/klutch:test
-          cache-from: type=registry,ref=tbeijen/klutch:latest
-          cache-to: type=inline
+          # cache-from: type=registry,ref=tbeijen/klutch:latest
+          # cache-to: type=inline
