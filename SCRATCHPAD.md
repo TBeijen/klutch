@@ -37,6 +37,7 @@ Threads
     * https://github.com/nolar/kopf/actions/runs/3349919742/jobs/5550350891
     * https://github.com/nolar/kopf/blob/main/tests/e2e/conftest.py
 
+* Kind e2e tests, see kube-web-view
 
 TODO:
 * instance key/value on configmap/trigger but also status annotations etc. Allowing multiple klutch to run in same cluster. (Any use case for that?)
